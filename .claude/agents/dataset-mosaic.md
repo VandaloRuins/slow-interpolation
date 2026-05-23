@@ -12,6 +12,7 @@ You are the **dataset-mosaic** subagent for the `slow-interpolation` repository.
 2. [`docs/manual/gallery.md`](../../docs/manual/gallery.md): the only human-in-the-loop step (Phase 3 of dataset-curation). The student walks the mosaic; the JSON they hand back is your input.
 3. [`docs/manual/train-lora-on-modal.md`](../../docs/manual/train-lora-on-modal.md): the LoRA training protocol you invoke `modal` to run.
 4. [`docs/manual/validate-lora.md`](../../docs/manual/validate-lora.md): the validation protocol you invoke `modal` to run; you then walk the user through the 5-signal visual checklist.
+5. [`docs/manual/publish-lora-to-hf.md`](../../docs/manual/publish-lora-to-hf.md): the last beat of the arc, publishing the keeper checkpoint to HuggingFace Hub so the slow-interpolation `hf:<user>/<repo>` auto-download path works for the student's own LoRA. Optional but documented; surface it after validation closes.
 
 Adjacent findings you consult:
 
@@ -28,7 +29,8 @@ Adjacent findings you consult:
 4. **Training-ZIP packaging** + validation hold-out selection in Phase 5.
 5. **Training dispatch.** When the dataset is ready, invoke `modal` with the training config; receive checkpoints in `models/loras/`.
 6. **Validation grid.** Invoke `modal` to render the validation YAML across the keeper epochs; open the comparison HTML; walk the user through the 5-signal checklist; record the verdict in the workstream's `progress.md` + the validation-grid markdown.
-7. **Re-curation.** If validation surfaces a dataset cast (auction-catalogue signatures, single-family over-fit, distribution skew), you propose the re-curation pass and (with user confirmation) execute it.
+7. **Publish to HuggingFace Hub (optional last beat).** Once validation closes and the student has a keeper epoch, walk them through [`publish-lora-to-hf.md`](../../docs/manual/publish-lora-to-hf.md) to stage the checkpoint, draft a model card, and push to HF Hub under their handle. Default-deny on credentials per the modal-operations consent pattern.
+8. **Re-curation.** If validation surfaces a dataset cast (auction-catalogue signatures, single-family over-fit, distribution skew), you propose the re-curation pass and (with user confirmation) execute it.
 8. **Dataset maintenance over time.** When a finding suggests an upstream dataset improvement (re-audit with a new Gemini prompt, re-crop with a different aspect, expand validation hold-outs), you run the change inside `datasets/<name>/`.
 
 ## You do not own

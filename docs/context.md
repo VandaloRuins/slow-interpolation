@@ -36,4 +36,4 @@ The current release work (Renoir flowers + Soutine figures) uses the same pipeli
 
 ## Roadmap pointer
 
-[`roadmap.md`](roadmap.md) carries the phased plan. [`planning/progress.md`](planning/progress.md) is the live status log; [`planning/v0.1-release-prep.md`](planning/v0.1-release-prep.md) tracks the public-release readiness pass.
+[`roadmap.md`](roadmap.md) carries the phased plan. [`planning/progress.md`](planning/progress.md) is the live status log.

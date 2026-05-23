@@ -75,7 +75,7 @@ Under [planning/](planning/). High-churn. Parent chat owns `progress.md`; each p
 
 Public workstream folders (shipped-milestone case studies; readable end-to-end):
 
-- [planning/workstreams/modal/](planning/workstreams/modal/) - Modal cloud infrastructure. [progress](planning/workstreams/modal/progress.md), [followup-plan](planning/workstreams/modal/followup-plan.md), [release-batch](planning/workstreams/modal/release-batch.md).
+- [planning/workstreams/modal/](planning/workstreams/modal/) - Modal cloud infrastructure. [progress](planning/workstreams/modal/progress.md), [release-batch](planning/workstreams/modal/release-batch.md).
 - [planning/workstreams/noise/](planning/workstreams/noise/) - Noise sources research. [progress](planning/workstreams/noise/progress.md).
 - [planning/workstreams/renoir-dataset/](planning/workstreams/renoir-dataset/) - Renoir floral dataset + training playbook. [progress](planning/workstreams/renoir-dataset/progress.md), [validation-grid](planning/workstreams/renoir-dataset/validation-grid.md).
 
@@ -83,7 +83,6 @@ In-progress workstreams (compositing, inpaint, soutine-LoRA, modal-trainer, alt-
 
 Other planning surfaces:
 
-- [planning/v0.1-release-prep.md](planning/v0.1-release-prep.md) - this release-prep tracker.
 - [planning/kickoff-prompt.md](planning/kickoff-prompt.md) - parent-chat session opener.
 - [planning/docs-strategy.md](planning/docs-strategy.md) - docs-tree strategy + naming convention.
 - [planning/pipeline-split-decision.md](planning/pipeline-split-decision.md) - D3 prep decision on splitting `pipeline.md` into manual + reference.

@@ -31,6 +31,7 @@ When the user asks for an operation that looks like one of these shapes, **the p
 | Stand up a gallery to visually QA images | [gallery.md](gallery.md) | Same gallery server works on any `datasets/<name>/` folder. The HTML rebuild is keyword-substitution on the Renoir template. |
 | Train a LoRA on CivitAI | [../findings/lora-training.md](../findings/lora-training.md) | The Renoir worked example. Future generic recipe lands at `findings/lora-pipeline.md` post-Renoir-training export. |
 | **Validate a freshly trained LoRA** (epoch comparison, engine bake-off, over-fit check) | [validate-lora.md](validate-lora.md) | Family-agnostic. Drives [`cloud/validate_lora.py`](../../cloud/validate_lora.py) via per-family YAML at `examples/configs/validation/<family>.yaml`. Five-phase: author YAML, route to Modal, dispatch one run per epoch, assemble comparison HTML, walk the user through the 5-signal checklist. Outputs at `outputs/validation/<family>/epoch-<N>/`. |
+| **Publish a freshly trained LoRA to HuggingFace Hub** (so others can use it via the `hf:<user>/<repo>` YAML syntax) | [publish-lora-to-hf.md](publish-lora-to-hf.md) | Last beat of the dataset-mosaic arc. Five-phase: HF account + write-scope token (with default-deny consent escalation on credentials); stage checkpoint + draft model card; create empty HF repo via `hf repos create`; upload via `hf upload`; verify + cross-link. Includes a parameterised model card template derived from the two demo-LoRA worked examples. |
 | Pick a noise source for a subject | [noise.md](noise.md), with deeper rationale in [../findings/noise-sources.md](../findings/noise-sources.md) | Decision table indexed on motion character. Spatial frequency is the primary axis; pick high-frequency (`evolved`, small `feature_size`, high `cell_density`) for fine-brushwork LoRAs, low-frequency for bold regional shifts. |
 
 If your task does not match any row, scan the workstream progress logs under [../planning/workstreams/](../planning/workstreams/) for adjacent work before building. The repo's value compounds when agents reuse the documented protocols and contribute back; it degrades when each new task spawns a parallel implementation.
@@ -47,6 +48,7 @@ Read what is relevant to your task. Do not read every page on every session.
 6. **Operating the dataset-curation gallery tool:** [gallery.md](gallery.md). How you stand the gallery up, brief the student, and process the JSON they hand back.
 7. **Picking a noise source for a subject:** [noise.md](noise.md). Decision table for the seven-source palette; spatial-frequency lever as the primary axis.
 8. **Validating a freshly trained LoRA:** [validate-lora.md](validate-lora.md). Family-agnostic epoch / engine comparison protocol; assembles a side-by-side HTML the user opens to make the visual call.
+9. **Publishing a freshly trained LoRA to HuggingFace Hub:** [publish-lora-to-hf.md](publish-lora-to-hf.md). Last beat of the dataset-mosaic arc; stages the checkpoint, drafts a model card from a parameterised template, creates the repo, uploads, verifies.
 
 ## Slated for Phase D3 (not yet written)
 
