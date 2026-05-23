@@ -1,0 +1,70 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.DS_Store
+
+outputs/
+datasets/**/raw/
+datasets/**/processed/
+*.safetensors
+*.ckpt
+*.pt
+*.bin
+
+# Large LoRA / model assets live under models/, gitignored but layout preserved via models/README.md
+models/loras/*
+!models/loras/.gitkeep
+!models/README.md
+
+.ipynb_checkpoints/
+
+# Local-only sidecars carrying personal context, release-timeline details,
+# parallel-project references, and machine-specific paths. The public tracked
+# CLAUDE.md / docs/context.md are sanitised versions; the .local.md files stay
+# on the author's machine.
+CLAUDE.local.md
+docs/context.local.md
+docs/planning/private/
+
+# HuggingFace Hub upload staging area. Contains LoRA .safetensors + draft model
+# cards before they are pushed to HF Hub. Not part of the public repo.
+models/hf-staging/
+
+# Playwright MCP runtime scratch (browser snapshots, console logs). Agent
+# runtime artifact, not source. Not part of the public repo.
+.playwright-mcp/
+
+# Training-artifact captures (validation grids, manifests) from in-flight LoRA
+# training. Ships publicly alongside the relevant LoRA release on HuggingFace
+# Hub, not in this repo.
+train-artifacts/
+
+# Pitch materials, sketches, and ad-hoc spot-check outputs from the maintainer's
+# private workflow. Not part of the public artifact.
+pitch-materials/
+local-spot-check/
+soutine-after-*.png
+soutine-before-*.png
+
+# Bulk dataset content. The dataset-mosaic protocol's worked-example Python
+# scripts under datasets/<name>/*.py ship publicly; image bytes, training ZIPs,
+# manifests, gallery state, generated HTML, and rejected-image piles do not.
+datasets/**/raw/
+datasets/**/raw_orig/
+datasets/**/rejected/
+datasets/**/processed/
+datasets/**/validation/
+datasets/**/_civitai_staging/
+datasets/**/gallery-state*
+datasets/**/captions/
+datasets/**/*.zip
+datasets/**/*.csv
+datasets/**/*.jpg
+datasets/**/*.jpeg
+datasets/**/*.png
+datasets/**/*.json
+datasets/**/*.html
+datasets/**/*.txt

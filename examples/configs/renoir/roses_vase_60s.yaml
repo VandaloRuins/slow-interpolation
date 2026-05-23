@@ -1,0 +1,70 @@
+# Renoir pink-roses-in-a-vase slow drift, ~60 s loop.
+#
+# Canonical example from docs/findings/lora-training.md section 8. Three palette
+# / light slots (afternoon, daylight, studio) over a fixed composition.
+#
+# LoRA file is a placeholder; replace once training drops the actual filename
+# under models/loras/.
+
+style:
+  name: renoir_flowers_epoch_10
+  lora_path: models/loras/Renoir_Flowers_epoch_10.safetensors
+  lora_scale: 0.80
+  prefix: "rfl, "
+  suffix: ", oil painting, impressionist"
+  negative_prompt: "frame, vignette, panel, ornament, photograph, modern, sharp, photoreal"
+
+subject:
+  name: renoir_roses_vase
+  prompts:
+    - label: "A: warm afternoon"
+      prompt: >-
+        a porcelain vase of pink roses on a marble side table, centered still
+        life, warm afternoon light, creamy whites and pinks against a deep rose
+        ground, visible brushstrokes
+    - label: "B: deep crimson"
+      prompt: >-
+        the same vase of pink roses, blooms opening further, warm afternoon
+        light, creamy whites and rose against a deep terracotta ground, layered
+        impasto petals
+    - label: "C: cool studio"
+      prompt: >-
+        the same vase of pink roses, petals at full bloom, cool studio light,
+        blue-greys and lavenders with green leaves catching highlights, loose
+        painterly handling
+    - label: "A (return)"
+      prompt: >-
+        a porcelain vase of pink roses on a marble side table, centered still
+        life, warm afternoon light, creamy whites and pinks against a deep rose
+        ground, visible brushstrokes
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 5
+  transition: 3
+  return_: 4
+  warmup: 3
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 24
+  quality: 5
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+output_dir: outputs

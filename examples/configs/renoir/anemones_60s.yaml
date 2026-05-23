@@ -1,0 +1,67 @@
+# Renoir anemones-in-a-small-vase slow drift, ~60 s loop.
+#
+# Anemones run high-chroma and read flatter than roses; the LoRA's strongest
+# off-distribution behaviour is on this kind of multi-coloured cluster. Keep
+# the scale at 0.80 for the release; bump to 0.85 if the colour separation
+# weakens.
+
+style:
+  name: renoir_flowers_epoch_10
+  lora_path: models/loras/Renoir_Flowers_epoch_10.safetensors
+  lora_scale: 0.80
+  prefix: "rfl, "
+  suffix: ", oil painting, impressionist"
+  negative_prompt: "frame, vignette, panel, ornament, photograph, modern, sharp, photoreal"
+
+subject:
+  name: renoir_anemones
+  prompts:
+    - label: "A: ochre ground"
+      prompt: >-
+        a bouquet of anemones in a small glass vase, close-cropped centered
+        still life, ochre and umber backdrop, pale petals catching the
+        front-light, visible brushstrokes
+    - label: "B: tobacco rich"
+      prompt: >-
+        the same bouquet of anemones, deeper saturation, rich impasto reds and
+        crimsons against a tobacco-brown ground, layered impasto petals
+    - label: "C: garden dappled"
+      prompt: >-
+        the same bouquet of anemones, buttery cream and apricot tones, dappled
+        garden light, loose painterly handling
+    - label: "A (return)"
+      prompt: >-
+        a bouquet of anemones in a small glass vase, close-cropped centered
+        still life, ochre and umber backdrop, pale petals catching the
+        front-light, visible brushstrokes
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 5
+  transition: 3
+  return_: 4
+  warmup: 3
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 24
+  quality: 5
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+output_dir: outputs

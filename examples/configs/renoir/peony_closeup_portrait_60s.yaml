@@ -1,0 +1,68 @@
+# Renoir single-peony close-up slow drift, ~60 s loop. PORTRAIT orientation.
+#
+# Tests two things in one config: (1) portrait orientation (transposed SDXL
+# bucket, 768 x 1344 instead of 1344 x 768), (2) tightly-cropped single-bloom
+# composition rather than vase-on-table. Useful as the "intimate" companion
+# piece to the bouquet-scale loops.
+
+style:
+  name: renoir_flowers_epoch_10
+  lora_path: models/loras/Renoir_Flowers_epoch_10.safetensors
+  lora_scale: 0.80
+  prefix: "rfl, "
+  suffix: ", oil painting, impressionist"
+  negative_prompt: "frame, vignette, panel, ornament, photograph, modern, sharp, photoreal"
+
+subject:
+  name: renoir_peony_closeup
+  prompts:
+    - label: "A: blush close"
+      prompt: >-
+        a single peony in close-up, close-cropped fragment, petals filling the
+        frame edge to edge, soft natural daylight, blush pinks and ivory
+        against a slate-grey background, visible brushstrokes
+    - label: "B: garden dappled"
+      prompt: >-
+        the same single peony in close-up, petals opening further, buttery
+        cream and apricot tones, dappled garden light, layered impasto petals
+    - label: "C: tobacco rich"
+      prompt: >-
+        the same single peony in close-up, petals at full bloom, rich impasto
+        reds and crimsons against a tobacco-brown ground, loose painterly
+        handling
+    - label: "A (return)"
+      prompt: >-
+        a single peony in close-up, close-cropped fragment, petals filling the
+        frame edge to edge, soft natural daylight, blush pinks and ivory
+        against a slate-grey background, visible brushstrokes
+
+resolution:
+  width: 768
+  height: 1344
+
+frames:
+  steady: 5
+  transition: 3
+  return_: 4
+  warmup: 3
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 24
+  quality: 5
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+output_dir: outputs

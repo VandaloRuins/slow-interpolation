@@ -1,0 +1,108 @@
+# Validation prompt set for the Renoir flowers LoRA family.
+#
+# Render one epoch's grid:
+#   modal run -m cloud.validate_lora --config examples/configs/validation/renoir.yaml --epoch 10
+#
+# Compare against the archived CivitAI baseline via
+# `outputs/validation/comparison.html` (mirror its structure for any
+# new family).
+#
+# History note: this file is the de-Renoir-hardcoded version of the
+# original cloud/validation_renoir.py prompt lists. Two tracks:
+# Track 1 = off-distribution flower fields (the actual production
+# target; LoRA never trained on outdoor scenes), Track 2 = in-
+# distribution bouquet / vase hold-outs (the "did it learn" check).
+
+family: renoir-flowers
+lora_filename_template: "Renoir_Flowers_epoch_{epoch}.safetensors"
+default_epochs: [1, 5, 10]
+
+render:
+  width: 1216
+  height: 832
+  seed: 42
+  lora_scale: 0.85
+  guidance_scale: 1.5
+  num_inference_steps: 4
+  base_model: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight: sdxl_lightning_4step_lora.safetensors
+  taesd_vae: madebyollin/taesdxl
+
+negative_prompt: >
+  photograph, 3D render, anime, cartoon, digital art, smooth blending,
+  sharp edges, vase, vessel, pot, indoor still life, table, tablecloth,
+  signature, watermark, frame, border
+
+tracks:
+  - name: field
+    label: "Track 1, flower fields (off-distribution)"
+    prompts:
+      - slug: F1-wildflower-meadow
+        text: >
+          rfl, a wildflower meadow in late spring, low horizon with grasses
+          and scattered blooms filling the foreground, warm afternoon light,
+          broken-colour pinks and creams against a green-gold ground, loose
+          painterly handling, oil painting, impressionist
+      - slug: F2-poppy-field
+        text: >
+          rfl, a field of red poppies at the edge of a meadow, distant tree
+          line on the horizon, midday sun, crimson and vermillion against an
+          ochre and umber ground, thinly painted ground with loaded brush on
+          the blooms, oil painting, impressionist
+      - slug: F3-garden-path-cornflowers
+        text: >
+          rfl, a garden path through tall grasses and cornflowers, vertical
+          composition with the path receding, dappled garden light, powdery
+          blues and pale rose against deep green, scumbled foliage with
+          feathered brushwork, oil painting, impressionist
+      - slug: F4-irises-daisies-hedgerow
+        text: >
+          rfl, a patch of irises and daisies along a hedgerow, horizontal
+          composition with flowers spilling forward, cool morning light, white
+          petals against a celadon green wall of foliage, broken colour
+          across the petals, oil painting, impressionist
+      - slug: F5-sunlit-garden
+        text: >
+          rfl, a sunlit garden in early summer with flower beds and shrubs in
+          the foreground and trees behind, dappled daylight and warm shadows,
+          broken-colour foliage, loose impressionist touch, oil painting,
+          impressionist
+      - slug: F6-roses-over-wall
+        text: >
+          rfl, a hill of pink and white roses spilling over a low garden wall,
+          mid-distance composition, buttery cream and apricot tones in golden
+          hour light, layered impasto petals against a soft scumbled
+          background, oil painting, impressionist
+
+  - name: vase
+    label: "Track 2, bouquet hold-outs (in-distribution)"
+    prompts:
+      - slug: V1-roses-vase
+        text: >
+          rfl, a porcelain vase of roses on a table, centered still life,
+          warm afternoon light, broken-colour petals against a soft
+          scumbled background, oil painting, impressionist
+      - slug: V2-mixed-flowers-earthenware
+        text: >
+          rfl, mixed flowers in an earthenware pot, centered still life on a
+          table, loose-bouquet idiom, warm afternoon light, broken colour
+          across the petals, oil painting, impressionist
+      - slug: V3-anemones
+        text: >
+          rfl, a study of anemones, close-cropped fragment, flowers filling
+          the frame edge to edge, cool morning light, white petals against a
+          celadon green wall, layered impasto petals, oil painting,
+          impressionist
+      - slug: V4-chrysanthemums
+        text: >
+          rfl, a bouquet of chrysanthemums, bouquet laid across the frame,
+          fabric or table cloth in the foreground, ochre and umber backdrop,
+          pale petals catching the front-light, feathered brushwork on the
+          leaves, oil painting, impressionist
+      - slug: V5-geraniums-copper
+        text: >
+          rfl, geraniums in a copper basin, centered potted plant on a table,
+          warm afternoon light, broken-colour leaves against a deep rose
+          ground, thinly painted ground with loaded brush on the blooms, oil
+          painting, impressionist

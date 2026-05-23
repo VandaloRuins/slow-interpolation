@@ -1,0 +1,94 @@
+# Renoir pink-roses lifecycle, ~70 s loop. v5.
+#
+# Uses the new per-prompt `negative_prompt` field (shipped with this config)
+# to suppress the LoRA's full-bloom pull at the A and A-return endpoints
+# without weakening Renoir character on B and C.
+#
+# Three changes from v4:
+#   1. A and A-return get a strong per-prompt anti-bloom negative. B and C
+#      fall back to the style-level negative (so their full-bloom positives
+#      and wilted positives are not fought).
+#   2. lora_scale restored to 0.80 (v4 had it at 0.65, which lost Renoir
+#      brushstrokes). The per-prompt negative is now doing the LoRA-suppression
+#      work at the endpoints instead.
+#   3. Loop closure made aggressive: frames.return_ 4 -> 10,
+#      return_pixel_blend_max 0.20 -> 0.55, return_strength_end 0.60 -> 0.45.
+#      The lifecycle drift is much larger than the default-tuned palette drift,
+#      so the return segment needs to pull harder toward the anchor.
+#
+# Kept: state-leading prompts, warm grey ground, structural_decay_radius=0,
+# default walking noise.
+
+style:
+  name: renoir_flowers_epoch_10
+  lora_path: models/loras/Renoir_Flowers_epoch_10.safetensors
+  lora_scale: 0.80
+  prefix: "rfl, "
+  suffix: ", oil painting, impressionist"
+  negative_prompt: "frame, vignette, panel, ornament, photograph, modern, sharp, photoreal, macabre, gothic, horror"
+
+subject:
+  name: renoir_roses_lifecycle_v5
+  prompts:
+    - label: "A: bare stems"
+      prompt: >-
+        a dormant rose plant with bare leafy stems and no flowers at all, just
+        green leaves and brown stems, gathered in a porcelain vase on a marble
+        side table, warm afternoon light, warm grey studio ground, leafy
+        greens and quiet browns, visible brushstrokes
+      negative_prompt: "roses, rose, blooms, bloom, flowers, flower, open petals, full bloom, splayed petals, lush flowers, petals, floral, blossoms, buds, pink, frame, vignette, panel, ornament, photograph, modern, sharp, photoreal"
+    - label: "B: full bloom"
+      prompt: >-
+        pink roses in heavy full bloom, abundant overlapping petals splayed
+        wide with layered impasto, gathered in a porcelain vase on a marble
+        side table, warm afternoon light, warm grey studio ground, creamy
+        whites and deep rose with green leaves catching highlights
+    - label: "C: withered dead"
+      prompt: >-
+        withered dead pink roses with shrivelled drooping petals, brown
+        curling petals scattered across the marble side table, drooping dried
+        stems, in a porcelain vase, warm afternoon light, warm grey studio
+        ground, muted ochres and faded pinks, loose painterly handling
+    - label: "A (return): bare stems"
+      prompt: >-
+        a dormant rose plant with bare leafy stems and no flowers at all, just
+        green leaves and brown stems, gathered in a porcelain vase on a marble
+        side table, warm afternoon light, warm grey studio ground, leafy
+        greens and quiet browns, visible brushstrokes
+      negative_prompt: "roses, rose, blooms, bloom, flowers, flower, open petals, full bloom, splayed petals, lush flowers, petals, floral, blossoms, buds, pink, frame, vignette, panel, ornament, photograph, modern, sharp, photoreal"
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 6
+  transition: 5
+  return_: 10
+  warmup: 3
+
+render:
+  structural_decay_radius: 0
+  return_pixel_blend_max: 0.55
+  return_strength_end: 0.45
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 24
+  quality: 5
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+output_dir: outputs

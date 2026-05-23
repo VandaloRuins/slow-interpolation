@@ -1,0 +1,91 @@
+# Soutine figures LoRA, training config v2 (expressionist preset).
+#
+# Re-train after v1 (soutine_figures.yaml) under-fit Soutine's
+# expressionist idiom. v1 used the Renoir-tuned defaults (rank 16,
+# alpha 8, LR 3e-5, 6 repeats); the cold-run produced competent
+# figurative oil portraits but missed the dragging brush + twisted
+# silhouettes + charged surface that define Soutine.
+#
+# v2 mirrors CivitAI's AI Toolkit defaults under our Kohya engine:
+# higher rank, higher LR, fewer repeats. If v2 recovers
+# expressionism, the engine choice is validated and the hyperparameter
+# preset gets documented in the trainer manual as "expressionist
+# style preset" (vs the existing "floral style preset" used by Renoir).
+# If v2 ALSO fails, the bottleneck is dataset size (80 images may be
+# insufficient for high-variance expressionist style learning).
+#
+# Run:
+#   modal run -m cloud.train_entrypoint --config examples/configs/training/soutine_figures_v2.yaml
+#
+# Validation:
+#   modal run -m cloud.validate_lora --config examples/configs/validation/soutine.yaml --epoch 10
+#   (publish-block writes to Soutine_Figures_epoch_<N>.safetensors,
+#    overwriting v1's published files on the slow-interp-loras volume)
+#
+# Expected cost: ~$1.00 to $1.20 on L40S (slightly less than v1 due
+# to fewer repeats; rank 32 adds modest memory but step time stays
+# close to v1).
+
+trainer: kohya
+base_model: stabilityai/stable-diffusion-xl-base-1.0
+
+dataset:
+  zip: soutine-figures-civitai.zip
+  trigger: stn
+  caption_extension: .txt
+
+training:
+  # CHANGED from v1: rank 16 -> 32, alpha 8 -> 32 (more parameter
+  # capacity for high-frequency expressionist marks; mirrors CivitAI
+  # AI Toolkit defaults).
+  network_rank: 32
+  network_alpha: 32
+
+  # CHANGED from v1: 3e-5 -> 5e-4 (~17x higher LR; matches CivitAI
+  # AI Toolkit's default for SDXL LoRA. Trade-off: subject artifacts
+  # at strong scales; mitigated by 2 repeats instead of 6).
+  unet_lr: 5.0e-4
+  text_encoder_lr: 0
+  optimizer: adamw8bit
+  lr_scheduler: cosine_with_restarts
+  lr_scheduler_num_cycles: 4
+  batch_size: 2
+  gradient_accumulation: 4
+
+  # CHANGED from v1: 6 -> 2 (matches CivitAI; with higher LR, fewer
+  # repeats prevents overfit on the 80-image dataset).
+  repeats: 2
+
+  epochs: 10
+  save_every_n_epochs: 1
+  mixed_precision: bf16
+  min_snr_gamma: 5.0
+  gradient_checkpointing: true
+  caption_shuffle: false
+  caption_tag_dropout: 0
+  resolution: 1024
+  enable_bucket: true
+  min_bucket_reso: 768
+  max_bucket_reso: 1344
+  bucket_no_upscale: true
+  network_train_unet_only: true
+
+per_image_repeats: null
+
+modal:
+  gpu: L40S
+  timeout: 14400
+  retries: 0
+
+validation:
+  prompts:
+    - "stn, a page boy in a red uniform, standing full body, smoke grey ground, twisted silhouette, dragging brush, oil painting, expressionist"
+    - "stn, a butcher's boy in a white apron stained red, full body, warm interior glow, charged surface, oil painting, expressionist"
+    - "stn, self-portrait of a young painter, head and shoulders, raw umber ground, dark eyes, dragging brush, oil painting, expressionist"
+  render_at_epochs: [1, 5, 10]
+  lora_scale: 0.80
+  seed: 0
+  output_format: contact_sheet
+
+publish:
+  checkpoint_template: "Soutine_Figures_epoch_{epoch}.safetensors"

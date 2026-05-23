@@ -1,0 +1,77 @@
+# Renoir wildflower-field slow drift, ~60 s loop.
+#
+# Off-distribution target for the Renoir LoRA. The validation grid
+# (docs/planning/workstreams/renoir-dataset/validation-grid.md, F1-F6) showed
+# epoch 1 preserves impressionist atmosphere on outdoor scenes better than
+# epoch 10, which over-fit the auction-catalogue surface. Use the light
+# checkpoint at higher scale to compensate.
+#
+# A/B/C/A drift cycles palette and light over the same meadow composition.
+
+style:
+  name: renoir_flowers_epoch_1
+  lora_path: models/loras/Renoir_Flowers_epoch_1.safetensors
+  lora_scale: 0.85
+  prefix: "rfl, "
+  suffix: ", oil painting, impressionist"
+  negative_prompt: "frame, vignette, panel, ornament, photograph, modern, sharp, photoreal, signature, watermark, text"
+
+subject:
+  name: renoir_wildflower_field
+  prompts:
+    - label: "A: late spring afternoon"
+      prompt: >-
+        a wildflower meadow in late spring, low horizon with grasses and
+        scattered blooms filling the foreground, warm afternoon light,
+        broken-colour pinks and creams against a green-gold ground, loose
+        painterly handling
+    - label: "B: poppy crimson"
+      prompt: >-
+        the same wildflower meadow with red poppies coming forward, midday
+        sun, crimson and vermillion against an ochre and umber ground,
+        thinly painted ground with loaded brush on the blooms
+    - label: "C: cornflower morning"
+      prompt: >-
+        the same meadow at cool morning, cornflowers and daisies through
+        tall grasses, powdery blues and pale rose against deep green,
+        scumbled foliage with feathered brushwork
+    - label: "A (return)"
+      prompt: >-
+        a wildflower meadow in late spring, low horizon with grasses and
+        scattered blooms filling the foreground, warm afternoon light,
+        broken-colour pinks and creams against a green-gold ground, loose
+        painterly handling
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 5
+  transition: 3
+  return_: 4
+  warmup: 3
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 24
+  quality: 5
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+output_dir: outputs
+
+modal:
+  gpu: L40S

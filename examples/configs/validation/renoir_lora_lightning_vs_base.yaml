@@ -1,0 +1,97 @@
+# Follow-up probe: does SDXL Lightning bottleneck the Renoir LoRA's
+# painterly brushwork?
+#
+# Premise. The backbone probe (`painterly_backbone.yaml`, run
+# 2026-05-18) showed SDXL base (30 steps, no LoRA) carries painterly
+# brushwork that SDXL Lightning (4 steps, no LoRA), FLUX schnell, and
+# FLUX dev all flatten. This file isolates the Lightning-vs-base
+# question on top of the production Renoir LoRA: if SDXL base + LoRA
+# beats SDXL Lightning + LoRA visibly on brushwork, the production
+# pipeline has a real architecture choice to make (drop Lightning,
+# accept ~7x compute per keyframe).
+#
+# Dispatch one backbone at a time:
+#
+#   modal run -m cloud.validate_backbone --config examples/configs/validation/renoir_lora_lightning_vs_base.yaml --backbone sdxl_lightning
+#   modal run -m cloud.validate_backbone --config examples/configs/validation/renoir_lora_lightning_vs_base.yaml --backbone sdxl_base
+#
+# Outputs:
+#   outputs/validation/renoir-lora-lightning-vs-base/<backbone>/<slug>.png
+#
+# Notes:
+#   - Same five prompts as the parent backbone probe, but prepended
+#     with the Renoir LoRA trigger `rfl,`. Prompts that pull the LoRA
+#     off-distribution (P2 Soutine figure, P3 Cole landscape) are kept
+#     intentionally so we see how Lightning vs base handles
+#     out-of-domain pulls with the same domain LoRA applied.
+#   - Renoir LoRA epoch 10 (`Renoir_Flowers_epoch_10.safetensors`).
+#     The Renoir validation grid identified epoch 10 as the canonical
+#     strong-Renoir checkpoint for bouquets and vase subjects; epoch 1
+#     is preferred for outdoor field subjects. Locking epoch 10 here
+#     because four of five prompts read as bouquet / floral close-up.
+#   - LoRA scale 0.85, the validated default from the Renoir
+#     validation grid.
+#   - Seed 42, 1024x1024 (square), to match the parent backbone probe.
+
+family: renoir-lora-lightning-vs-base
+
+render:
+  width: 1024
+  height: 1024
+  seed: 42
+
+backbones:
+
+  sdxl_lightning:
+    # Current production backbone, Renoir LoRA loaded.
+    model_id: stabilityai/stable-diffusion-xl-base-1.0
+    lightning_lora: ByteDance/SDXL-Lightning
+    lightning_weight: sdxl_lightning_4step_lora.safetensors
+    taesd_vae: madebyollin/taesdxl
+    num_inference_steps: 4
+    guidance_scale: 1.5
+    dtype: float16
+    lora:
+      filename: Renoir_Flowers_epoch_10.safetensors
+      scale: 0.85
+
+  sdxl_base:
+    # Same Renoir LoRA, but SDXL base at 30 steps + full CFG.
+    model_id: stabilityai/stable-diffusion-xl-base-1.0
+    num_inference_steps: 30
+    guidance_scale: 7.5
+    dtype: float16
+    lora:
+      filename: Renoir_Flowers_epoch_10.safetensors
+      scale: 0.85
+
+negative_prompt: >
+  photograph, 3D render, anime, cartoon, digital art, smooth blending,
+  signature, watermark, frame, border, plastic, glossy
+
+prompts:
+  - slug: P1-renoir-floral
+    text: >
+      rfl, a vase of pink roses on a wooden table, impressionist oil painting,
+      broken colour, dappled afternoon light, visible brushwork, soft
+      scumbled background, layered impasto petals
+  - slug: P2-soutine-figure
+    text: >
+      rfl, a standing figure in dark expressionist oil paint, twisted pose,
+      dragging impasto, carcass red and ochre, raw umber ground,
+      violent brushwork, full body in three-quarter view
+  - slug: P3-cole-landscape
+    text: >
+      rfl, a rocky valley with autumn trees, Hudson River School oil painting,
+      atmospheric perspective, late afternoon sun breaking through clouds,
+      luminous distance, painterly foreground rocks
+  - slug: P4-impasto-sunflowers
+    text: >
+      rfl, a thick impasto study of sunflowers, palette knife oil painting,
+      heavy texture, raised ridges of yellow and ochre paint, dark
+      blue-green ground, close-cropped composition
+  - slug: P5-compound-adherence
+    text: >
+      rfl, three red poppies on the right, one white daisy in the centre,
+      a blue sky above, a wooden fence on the left, oil painting on
+      canvas, loose impressionist handling

@@ -1,0 +1,76 @@
+# Smoke test config.
+#
+# Smallest possible exercise of all four phases (A keyframes, A.5 smoothing,
+# C+D RIFE + encode). Renders in ~10 seconds, ~0.005 USD on Modal L40S.
+#
+# Purpose: catch the cheap class of regressions (LoRA path drifted, image
+# rebuild broke an import, mount path changed, volume rotated, RIFE
+# checkpoint missing) before committing to a real render or a batch.
+#
+# Run locally:  python -m slow_interpolation.run examples/configs/smoke.yaml
+# Run on Modal: modal run -m cloud.smoke
+#
+# Keep this config minimal. Do NOT use it for any artistic purpose; the
+# rendered output is intentionally trivial.
+
+style:
+  name: thomas_cole_epoch_10_smoke
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.75
+  prefix: "tcole, romantic landscape oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: ""
+
+subject:
+  name: smoke
+  prompts:
+    - label: "A"
+      prompt: "a green valley with hazy mountains, oil painting"
+    - label: "B"
+      prompt: "a green valley with hazy mountains, oil painting"
+    - label: "C"
+      prompt: "a green valley with hazy mountains, oil painting"
+    - label: "A (return)"
+      prompt: "a green valley with hazy mountains, oil painting"
+
+resolution:
+  width: 1344
+  height: 768
+
+# Bare-minimum frame counts. Exercises every segment type (warmup, steady,
+# transition, return, anchor) with one frame each.
+frames:
+  steady: 1
+  transition: 1
+  return_: 1
+  warmup: 1
+
+# RIFE 1-pass (2x interpolation) instead of 6-pass (64x). Output video
+# is ~1 second long; that is fine for a smoke test.
+rife:
+  passes: 1
+  skip_boundary: 0
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 24
+  quality: 5
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+
+output_dir: outputs
+output_name: smoke

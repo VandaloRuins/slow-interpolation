@@ -1,0 +1,84 @@
+# Renoir pink-roses lifecycle, ~60 s loop. v3.
+#
+# v2 + a single change: structural_decay_radius lowered from default 2 to 0.
+# v1 and v2 came back blurry because the lifecycle prompts ("closed buds",
+# "wilted overblown", "new shoots") are off-distribution for the Renoir LoRA
+# (trained mostly on full-bloom paintings), so the diffusion step does not
+# inject detail back fast enough to replace what the default radius-2
+# pre-frame blur removes. Same mechanism that broke structured noise in
+# Round 1 of the noise-research workstream; same fix.
+#
+# All other v2 choices preserved: state-leading prompts, warm grey ground,
+# 6 steady / 4 transition frames, lora_scale 0.80, default walking noise.
+
+style:
+  name: renoir_flowers_epoch_10
+  lora_path: models/loras/Renoir_Flowers_epoch_10.safetensors
+  lora_scale: 0.80
+  prefix: "rfl, "
+  suffix: ", oil painting, impressionist"
+  negative_prompt: "frame, vignette, panel, ornament, photograph, modern, sharp, photoreal, macabre, gothic, horror"
+
+subject:
+  name: renoir_roses_lifecycle_v3
+  prompts:
+    - label: "A: closed buds"
+      prompt: >-
+        tightly closed small pink rosebuds, furled tight and not yet open,
+        gathered in a porcelain vase on a marble side table, warm afternoon
+        light, warm grey studio ground, creamy whites and soft pinks, visible
+        brushstrokes
+    - label: "B: full bloom"
+      prompt: >-
+        pink roses in heavy full bloom, petals splayed wide and layered with
+        impasto, gathered in a porcelain vase on a marble side table, warm
+        afternoon light, warm grey studio ground, creamy whites and deep
+        rose with green leaves catching highlights
+    - label: "C: overblown, petals falling"
+      prompt: >-
+        wilted overblown pink roses with drooping stems, loose petals
+        scattered across the marble side table, edges of the petals
+        softening and curling, in a porcelain vase, warm afternoon light,
+        warm grey studio ground, muted pinks and soft ochres, loose
+        painterly handling
+    - label: "A (return): new buds"
+      prompt: >-
+        fresh small pink rosebuds emerging from new green stems among older
+        spent stems, gathered in a porcelain vase on a marble side table,
+        a few lingering petals on the marble, warm afternoon light, warm
+        grey studio ground, creamy whites and soft pinks, visible
+        brushstrokes
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 6
+  transition: 4
+  return_: 4
+  warmup: 3
+
+render:
+  structural_decay_radius: 0
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 24
+  quality: 5
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+output_dir: outputs

@@ -1,0 +1,36 @@
+# All image-bearing folders and derived archives are gitignored. The repo
+# tracks only the metadata + captions + scripts that reproduce them.
+#
+# raw/ and rejected/ are already gitignored via the repo-root rule
+# `datasets/**/raw/` (raw/) — listed here for clarity and to cover the
+# sibling folders.
+raw/
+rejected/
+validation/
+_civitai_staging/
+*.zip
+
+# Intermediate audit artefacts from the sourcing script
+_commons_meta.csv
+_commons_rejects.csv
+
+# Originals backup created by apply_crops.py (kept locally for re-runs)
+raw_orig/
+
+# Gemini audit JSON; trace-data, not text-of-record
+review.json
+review_pass2.json
+processed.json
+gallery.html
+
+# Gallery state (server-side persistence of flags + manual crops).
+# Live on disk so user work survives browser/code/origin changes. The JSON
+# is local-only (it's your in-progress curation); the backups + log are
+# audit-only. None of these go in git.
+gallery-state.json
+gallery-state.log.jsonl
+gallery-state.backups/
+
+# Perceptual-hash cache used by build_gallery.py to cluster near-duplicates.
+# Pure derived data; regenerated from raw/ if missing.
+phashes.json

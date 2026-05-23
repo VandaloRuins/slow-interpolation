@@ -1,0 +1,85 @@
+# Renoir wildflower-field slow drift, ~60 s loop — v2 (thicker brushwork pass).
+#
+# v1 (`flower_field_60s.yaml`) at epoch 1 + scale 0.85 read too photographic.
+# Luca feedback 2026-05-18: brushwork too thin, want palette-knife / impasto
+# abstraction especially across the grass passages. v2 changes:
+# - LoRA: epoch 5 (mid-point) at scale 1.0 (full weight).
+# - Prompts lead with impasto / palette-knife / broken-color / abstracted-forms.
+# - Negative prompt extended with smooth / detailed / fine to push away from
+#   photographic readings.
+#
+# Compositing constraint (workstreams/compositing/progress.md): for the
+# Renoir+Soutine project, A/B/C/A stays subject-locked. This standalone
+# config is exempt; multi-species drift is the creative choice here.
+
+style:
+  name: renoir_flowers_epoch_5
+  lora_path: models/loras/Renoir_Flowers_epoch_5.safetensors
+  lora_scale: 1.0
+  prefix: "rfl, "
+  suffix: ", oil painting, impressionist, thick impasto, palette-knife passages, broken color, abstracted forms"
+  negative_prompt: "frame, vignette, panel, ornament, photograph, modern, sharp, photoreal, smooth, detailed, fine, signature, watermark, text"
+
+subject:
+  name: renoir_wildflower_field_v2
+  prompts:
+    - label: "A: late spring afternoon"
+      prompt: >-
+        a wildflower meadow in late spring, low horizon with abstracted
+        grasses and scattered blooms filling the foreground, warm afternoon
+        light, broken-colour pinks and creams across a green-gold ground,
+        thick palette-knife strokes on the foliage, visible loaded-brush
+        passages on the blooms
+    - label: "B: poppy crimson"
+      prompt: >-
+        the same wildflower meadow with red poppies coming forward, midday
+        sun, crimson and vermillion against an ochre and umber ground,
+        impasto petals scraped on with a knife, thinly painted ground letting
+        the weave show through
+    - label: "C: cornflower morning"
+      prompt: >-
+        the same meadow at cool morning, cornflowers and daisies through
+        tall grasses, powdery blues and pale rose against deep green, broken
+        colour across the foliage, abstracted grass massed in broad strokes,
+        scumbled feathered touch
+    - label: "A (return)"
+      prompt: >-
+        a wildflower meadow in late spring, low horizon with abstracted
+        grasses and scattered blooms filling the foreground, warm afternoon
+        light, broken-colour pinks and creams across a green-gold ground,
+        thick palette-knife strokes on the foliage, visible loaded-brush
+        passages on the blooms
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 5
+  transition: 3
+  return_: 4
+  warmup: 3
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 24
+  quality: 5
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+output_dir: outputs
+
+modal:
+  gpu: L40S

@@ -1,0 +1,75 @@
+# Renoir pink-roses lifecycle, ~60 s loop.
+#
+# Narrative slow drift: closed buds (A) -> full bloom (B) -> overblown, petals
+# falling, drying (C) -> fresh new buds emerging among the spent stems (A
+# return). The A-return rhymes with A so the loop closes naturally; the cycle
+# reads as bloom, decay, rebirth.
+#
+# Same fixed composition across all four slots: porcelain vase on a marble
+# side table, warm afternoon light, deep rose ground. Only the biological
+# state of the roses changes.
+
+style:
+  name: renoir_flowers_epoch_10
+  lora_path: models/loras/Renoir_Flowers_epoch_10.safetensors
+  lora_scale: 0.80
+  prefix: "rfl, "
+  suffix: ", oil painting, impressionist"
+  negative_prompt: "frame, vignette, panel, ornament, photograph, modern, sharp, photoreal, macabre, gothic, horror"
+
+subject:
+  name: renoir_roses_lifecycle
+  prompts:
+    - label: "A: closed buds"
+      prompt: >-
+        a porcelain vase of small pink rosebuds tightly closed and furled on a
+        marble side table, centered still life, warm afternoon light, creamy
+        whites and soft pinks against a deep rose ground, visible brushstrokes
+    - label: "B: full bloom"
+      prompt: >-
+        the same porcelain vase, the roses now in full bloom, petals splayed
+        wide and layered, warm afternoon light, creamy whites and deep rose
+        with green leaves catching highlights, layered impasto petals
+    - label: "C: overblown, petals falling"
+      prompt: >-
+        the same porcelain vase, the roses overblown and drooping, loose
+        petals scattered across the marble table, edges of the petals
+        browning and curling, warm afternoon light, muted pinks and ochres
+        against the deep rose ground, loose painterly handling
+    - label: "A (return): new buds"
+      prompt: >-
+        the same porcelain vase, fresh small pink rosebuds emerging from new
+        green stems among the spent older stems, marble table with a few
+        lingering petals, warm afternoon light, creamy whites and soft pinks
+        against a deep rose ground, visible brushstrokes
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 5
+  transition: 3
+  return_: 4
+  warmup: 3
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 24
+  quality: 5
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+output_dir: outputs

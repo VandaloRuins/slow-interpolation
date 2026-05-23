@@ -1,0 +1,128 @@
+# Backbone capability probe: 5 painterly prompts rendered across
+# multiple base diffusion models, no LoRA on any backbone. Answers
+# "does FLUX have a stronger painterly surface and prompt adherence
+# than SDXL out of the box?" before deciding whether to invest in
+# retraining the Renoir + Soutine LoRAs on FLUX.
+#
+# Dispatch one backbone at a time (the runner is GPU-bound and
+# loads only one pipeline at a time):
+#
+#   modal run -m cloud.validate_backbone --config examples/configs/validation/painterly_backbone.yaml --backbone sdxl_lightning
+#   modal run -m cloud.validate_backbone --config examples/configs/validation/painterly_backbone.yaml --backbone sdxl_base
+#   modal run -m cloud.validate_backbone --config examples/configs/validation/painterly_backbone.yaml --backbone flux_schnell
+#   modal run -m cloud.validate_backbone --config examples/configs/validation/painterly_backbone.yaml --backbone flux_dev
+#
+# Outputs:
+#   outputs/validation/painterly-backbone/<backbone>/<slug>.png
+#   outputs/validation/painterly-backbone/<backbone>/_manifest.json
+#
+# Compare side by side: same row = same prompt, columns = backbones.
+# Visual contact sheet assembly is post-hoc (browse the volume).
+#
+# Notes:
+#   - flux_dev is HuggingFace-gated (https://huggingface.co/black-forest-labs/FLUX.1-dev).
+#     Luca must accept the license, then expose a HF token to Modal:
+#       modal secret create huggingface HF_TOKEN=<token>
+#     The validate_backbone app will pick up that secret when present.
+#   - flux_schnell is Apache 2.0 (ungated). Use it first to verify the
+#     harness end to end, then run flux_dev for the actual best-case
+#     capability read.
+#   - seed is held constant across backbones; FLUX and SDXL do NOT
+#     produce visually similar outputs at the same seed (different
+#     latent geometry), but each backbone is self-consistent across
+#     re-runs of the same config.
+
+family: painterly-backbone-probe
+
+# Common render geometry (square; not the release 9:16, this is a
+# capability probe not a production render).
+render:
+  width: 1024
+  height: 1024
+  seed: 42
+
+# Per-backbone params. The runner reads only the section matching the
+# --backbone CLI argument; other sections are ignored.
+backbones:
+
+  sdxl_lightning:
+    # Current production backbone, naked (no Renoir / Soutine LoRA).
+    # Establishes the "what does the SDXL Lightning surface look like
+    # without our LoRAs" baseline.
+    model_id: stabilityai/stable-diffusion-xl-base-1.0
+    lightning_lora: ByteDance/SDXL-Lightning
+    lightning_weight: sdxl_lightning_4step_lora.safetensors
+    taesd_vae: madebyollin/taesdxl
+    num_inference_steps: 4
+    guidance_scale: 1.5
+    dtype: float16
+
+  sdxl_base:
+    # SDXL 1.0 base at full quality (no Lightning distillation). The
+    # honest SDXL-family ceiling for painterly surface and prompt
+    # adherence at this resolution.
+    model_id: stabilityai/stable-diffusion-xl-base-1.0
+    num_inference_steps: 30
+    guidance_scale: 7.5
+    dtype: float16
+
+  flux_schnell:
+    # FLUX.1 [schnell], Apache 2.0, 4-step distilled. Production-speed
+    # FLUX candidate. Use this to verify the harness end to end before
+    # spending gated-model setup time on flux_dev.
+    model_id: black-forest-labs/FLUX.1-schnell
+    num_inference_steps: 4
+    guidance_scale: 0.0
+    dtype: bfloat16
+    max_sequence_length: 256
+
+  flux_dev:
+    # FLUX.1 [dev], gated, 12B params, the actual best-case capability
+    # read. Requires HF license acceptance + Modal HF_TOKEN secret.
+    model_id: black-forest-labs/FLUX.1-dev
+    num_inference_steps: 28
+    guidance_scale: 3.5
+    dtype: bfloat16
+    max_sequence_length: 512
+
+# Negative prompt applied to SDXL backbones only. FLUX does not use
+# classifier-free guidance the same way and ignores negative_prompt
+# (the runner skips it for FLUX).
+negative_prompt: >
+  photograph, 3D render, anime, cartoon, digital art, smooth blending,
+  signature, watermark, frame, border, plastic, glossy
+
+# Five prompts probing the three capabilities at issue:
+#   1, 2 = painterly surface (broken-colour Renoir, dragging impasto Soutine)
+#   3    = atmospheric painterly landscape (Cole-family)
+#   4    = pure impasto stress test (palette knife)
+#   5    = compound prompt adherence (count + placement + colours)
+#
+# No trigger words. Style guidance is entirely descriptive prose.
+
+prompts:
+  - slug: P1-renoir-floral
+    text: >
+      a vase of pink roses on a wooden table, impressionist oil painting,
+      broken colour, dappled afternoon light, visible brushwork, soft
+      scumbled background, layered impasto petals
+  - slug: P2-soutine-figure
+    text: >
+      a standing figure in dark expressionist oil paint, twisted pose,
+      dragging impasto, carcass red and ochre, raw umber ground,
+      violent brushwork, full body in three-quarter view
+  - slug: P3-cole-landscape
+    text: >
+      a rocky valley with autumn trees, Hudson River School oil painting,
+      atmospheric perspective, late afternoon sun breaking through clouds,
+      luminous distance, painterly foreground rocks
+  - slug: P4-impasto-sunflowers
+    text: >
+      a thick impasto study of sunflowers, palette knife oil painting,
+      heavy texture, raised ridges of yellow and ochre paint, dark
+      blue-green ground, close-cropped composition
+  - slug: P5-compound-adherence
+    text: >
+      three red poppies on the right, one white daisy in the centre,
+      a blue sky above, a wooden fence on the left, oil painting on
+      canvas, loose impressionist handling

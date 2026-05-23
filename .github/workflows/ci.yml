@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Tests + link-check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install package + dev extras
+        run: |
+          python -m pip install --upgrade pip
+          # Install with dev extras. NOT the cloud extra (Modal SDK is
+          # not exercised in CI; the cloud path is tested manually
+          # against a Modal workspace).
+          pip install -e .[dev]
+
+      - name: Run tests
+        run: |
+          # The full pipeline tests need a GPU and shipping LoRAs; we
+          # run only the CPU-safe subset in CI. See tests/conftest.py
+          # for the markers. Test_noise_sources and test_evolved_walk
+          # are CPU-safe and cover the core noise interface.
+          pytest tests/ -v --ignore=tests/test_modal_contract.py
+
+      - name: Link-check docs (informational)
+        # Reports broken relative links; does not fail the build during the
+        # v0.1 ramp-up while forward-refs (`findings/lora-pipeline.md` etc.)
+        # are still landing. Flip to `--strict` once the baseline is at 0.
+        run: |
+          python tools/check_doc_links.py || echo "(link-check non-zero exit, informational only for v0.1)"

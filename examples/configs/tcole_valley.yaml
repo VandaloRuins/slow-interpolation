@@ -1,0 +1,102 @@
+# Phase 2 acceptance config.
+#
+# Renders the "tcole_valley" subject through the Thomas Cole SDXL LoRA at the
+# horizontal entry-point variant settings that produced
+# examples/outputs/tcole_valley_horizontal_v2.mp4.
+#
+# Acceptance: visually equivalent to the legacy MP4 (same composition family,
+# same palette and surface, no border / pulse / loop-closure regressions).
+# Frame-for-frame match is not a goal; the legacy noise walk is not seed-
+# controlled. See docs/roadmap.md Phase 2.
+
+style:
+  name: thomas_cole_epoch_10
+  # `hf:<user>/<repo>` resolves via the HuggingFace cache on first use.
+  # First run downloads ~228 MB; subsequent runs reuse the cache. Override
+  # with a local path (e.g. `models/loras/Thomas_Cole_epoch_10.safetensors`)
+  # if you have the file locally and want to skip the HF call.
+  lora_path: hf:VRuins/thomas-cole-sdxl-lora
+  lora_scale: 0.75
+  prefix: "tcole, romantic landscape oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: ""
+
+subject:
+  name: tcole_valley
+  prompts:
+    - label: "A: Valley amber"
+      prompt: >-
+        a sweeping panoramic view across a vast green valley of lush emerald
+        grasslands, open meadow filling the entire foreground and middle
+        ground, tiny ancient Roman aqueduct ruins with crumbling brick arches
+        far away on the distant horizon, hazy blue mountains behind, warm
+        amber afternoon light, oil painting
+    - label: "B: Valley golden"
+      prompt: >-
+        a sweeping panoramic view across a vast green valley of lush emerald
+        grasslands, open meadow filling the entire foreground and middle
+        ground, tiny ancient Roman aqueduct ruins with crumbling brick arches
+        far away on the distant horizon, hazy blue mountains behind, warm
+        golden hour light, oil painting
+    - label: "C: Valley morning"
+      prompt: >-
+        a sweeping panoramic view across a vast green valley of lush emerald
+        grasslands, open meadow filling the entire foreground and middle
+        ground, tiny ancient Roman aqueduct ruins with crumbling brick arches
+        far away on the distant horizon, pale misty mountains behind, soft
+        morning light with mist, oil painting, luminism
+    - label: "A (return)"
+      prompt: >-
+        a sweeping panoramic view across a vast green valley of lush emerald
+        grasslands, open meadow filling the entire foreground and middle
+        ground, tiny ancient Roman aqueduct ruins with crumbling brick arches
+        far away on the distant horizon, hazy blue mountains behind, warm
+        amber afternoon light, oil painting
+
+# render: defaults to RenderProfile.standard() (matches the non-calm legacy
+# entry-point variant). To use the calmer profile, replace with:
+#   render: calm
+# To override individual fields on top of a preset:
+#   render:
+#     profile: standard
+#     steady_noise_blend: 0.06
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 5
+  transition: 3
+  return_: 4
+  warmup: 3
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  # 0 since the 2026-05-16 border-crop probe (docs/findings/border-crop.md);
+  # crops_coords_top_left + the latent edge callback already suppress edges.
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 24
+  quality: 5
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+
+output_dir: outputs
+# output_name: optional. Defaults to subject.name at render time.

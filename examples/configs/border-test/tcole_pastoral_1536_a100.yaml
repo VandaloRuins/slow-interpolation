@@ -1,0 +1,110 @@
+# T3#11: 1536x896 upscale-source probe.
+#
+# Same Cole pastoral subject + negative prompt as tcole_pastoral_20s_nocrop.yaml.
+# Only deltas: resolution 1344x768 -> 1536x896 (next SDXL training bucket up),
+# GPU L40S -> A100-80GB (larger frame area + more headroom).
+#
+# Goal: confirm border behavior holds at 1536x896 with edge_crop=0. If
+# clean, this becomes the new source resolution for upscale targets
+# (1920x1080 deliveries, Renoir release 2048x1152 or 4K), with the upscale
+# ratio dropping from 1.43x to 1.25x for the 1920x1080 case.
+#
+# If border artifacts appear at 1536x896 that did not appear at 1344x768,
+# the verdict is "stick at 1344x768 native, lanczos upscale as planned".
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.75
+  prefix: "tcole, romantic landscape oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: >-
+    figure, person, human, foreground subject, close-up, portrait, large
+    foreground object, ruins in foreground, columns in foreground, tree in
+    foreground, picture frame, decorative arch, ornate border, framed painting,
+    gilded frame, vignette, dark border, dark vignette
+
+subject:
+  name: tcole_pastoral_1536
+  prompts:
+    - label: "A: Pastoral valley amber"
+      prompt: >-
+        a vast pastoral valley seen from a high vantage point, wide landscape
+        with rolling green hills and forests extending to the horizon, a tiny
+        distant hilltop village with terracotta rooftops and a small church
+        bell tower visible far away in the middle distance, a thin river
+        winding through the valley floor, warm amber late afternoon light,
+        dramatic cumulus clouds in the sky above, soft atmospheric perspective,
+        oil painting, romantic wilderness landscape
+    - label: "B: Pastoral valley golden"
+      prompt: >-
+        a vast pastoral valley seen from a high vantage point, wide landscape
+        with rolling green hills and forests extending to the horizon, a tiny
+        distant hilltop village with terracotta rooftops and a small church
+        bell tower visible far away in the middle distance, a thin river
+        winding through the valley floor, warm golden hour light raking
+        across the hills, dramatic cumulus clouds catching gold, soft
+        atmospheric perspective, oil painting, romantic wilderness landscape
+    - label: "C: Pastoral valley misty dawn"
+      prompt: >-
+        a vast pastoral valley seen from a high vantage point, wide landscape
+        with rolling green hills and forests extending to the horizon, a tiny
+        distant hilltop village with terracotta rooftops and a small church
+        bell tower visible far away in the middle distance, a thin river
+        winding through the valley floor, pale cool dawn light, dense valley
+        mist softening the lower hills, luminism, oil painting, romantic
+        wilderness landscape
+    - label: "A (return): Pastoral valley amber"
+      prompt: >-
+        a vast pastoral valley seen from a high vantage point, wide landscape
+        with rolling green hills and forests extending to the horizon, a tiny
+        distant hilltop village with terracotta rooftops and a small church
+        bell tower visible far away in the middle distance, a thin river
+        winding through the valley floor, warm amber late afternoon light,
+        dramatic cumulus clouds in the sky above, soft atmospheric perspective,
+        oil painting, romantic wilderness landscape
+
+# UP from the SDXL 1344x768 bucket to the 1536x896 bucket.
+resolution:
+  width: 1536
+  height: 896
+
+# Frame counts identical to the existing nocrop test for an apples-to-apples
+# comparison with tcole_pastoral_20s_nocrop.mp4.
+frames:
+  steady: 2
+  transition: 1
+  return_: 1
+  warmup: 3
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 24
+  quality: 5
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+
+output_dir: outputs/border-test
+output_name: tcole_pastoral_1536_a100
+
+# T3#11-specific: opt up to A100 80GB for the larger frame area.
+modal:
+  gpu: A100-80GB

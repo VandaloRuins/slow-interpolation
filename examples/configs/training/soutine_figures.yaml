@@ -1,0 +1,78 @@
+# Soutine figures LoRA, training config.
+#
+# Trains a Soutine-style SDXL LoRA on Modal using the dataset curated
+# via the dataset-mosaic protocol (see docs/manual/dataset-curation.md
+# Phase 5 hand-off). 80 image/caption pairs, trigger `stn`.
+#
+# Hyperparameters mirror the Renoir cold-run defaults exactly. The
+# only domain-specific changes are dataset.zip, dataset.trigger, and
+# publish.checkpoint_template.
+#
+# Run:
+#   modal run -m cloud.train_entrypoint --config examples/configs/training/soutine_figures.yaml
+#
+# Validation grid (post-training):
+#   modal run -m cloud.validate_lora --config examples/configs/validation/soutine.yaml --epoch 10
+#
+# Expected cost on L40S: ~$1.50 (80 images vs Renoir's 105, slightly
+# less wall time at the same hyperparameters).
+
+trainer: kohya
+base_model: stabilityai/stable-diffusion-xl-base-1.0
+
+dataset:
+  zip: soutine-figures-civitai.zip
+  trigger: stn
+  caption_extension: .txt
+
+training:
+  network_rank: 16
+  network_alpha: 8
+  unet_lr: 3.0e-5
+  text_encoder_lr: 0
+  optimizer: adamw8bit
+  lr_scheduler: cosine_with_restarts
+  lr_scheduler_num_cycles: 4
+  batch_size: 2
+  gradient_accumulation: 4
+  repeats: 6
+  epochs: 10
+  save_every_n_epochs: 1
+  mixed_precision: bf16
+  min_snr_gamma: 5.0
+  gradient_checkpointing: true
+  caption_shuffle: false
+  caption_tag_dropout: 0
+  resolution: 1024
+  enable_bucket: true
+  min_bucket_reso: 768
+  max_bucket_reso: 1344
+  bucket_no_upscale: true
+  network_train_unet_only: true
+
+per_image_repeats: null
+
+modal:
+  gpu: L40S
+  timeout: 14400
+  retries: 0
+
+# Trainer-inline validation: 3 prompts × 3 epochs = 9-cell contact
+# sheet, runs at 1024×1024 with 30-step standard SDXL. Cheap signal
+# during training; the production-quality grid is
+# `cloud/validate_lora.py` with the soutine.yaml config (Lightning
+# 4-step, 1216×832 portrait, scale 0.85).
+validation:
+  prompts:
+    - "stn, a page boy in a red uniform, standing full body, smoke grey ground, twisted silhouette, dragging brush, oil painting, expressionist"
+    - "stn, a butcher's boy in a white apron stained red, full body, warm interior glow, charged surface, oil painting, expressionist"
+    - "stn, self-portrait of a young painter, head and shoulders, raw umber ground, dark eyes, dragging brush, oil painting, expressionist"
+  render_at_epochs: [1, 5, 10]
+  lora_scale: 0.80
+  seed: 0
+  output_format: contact_sheet
+
+# Publish to top of slow-interp-loras so cloud/validate_lora.py picks
+# up by convention.
+publish:
+  checkpoint_template: "Soutine_Figures_epoch_{epoch}.safetensors"

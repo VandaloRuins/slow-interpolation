@@ -1,0 +1,89 @@
+# Renoir pink-roses lifecycle, ~60-70 s loop. v4.
+#
+# Bigger biological arc per Luca v3 feedback: bare rose stems in the vase
+# (no flowers) -> full bloom -> withered and dead -> bare stems again. A and
+# A-return are identical so the loop closes on the bare-plant state.
+#
+# Two changes from v3 to attack the persistent blur:
+#   1. lora_scale 0.80 -> 0.65. The lifecycle endpoints (bare stems, dead
+#      roses) are far off-distribution for a LoRA trained mostly on full-bloom
+#      paintings; the pull toward training distribution was producing
+#      uncertain, soft frames. Lower scale lets SDXL base handle the endpoints
+#      while the LoRA still tints style.
+#   2. frames.transition 4 -> 5. A->B now carries two biological steps (buds
+#      forming, then opening); needs more img2img steps to absorb cleanly.
+#
+# Kept from v3: structural_decay_radius=0, state-leading prompts, warm grey
+# studio ground, default walking noise.
+
+style:
+  name: renoir_flowers_epoch_10
+  lora_path: models/loras/Renoir_Flowers_epoch_10.safetensors
+  lora_scale: 0.65
+  prefix: "rfl, "
+  suffix: ", oil painting, impressionist"
+  negative_prompt: "frame, vignette, panel, ornament, photograph, modern, sharp, photoreal, macabre, gothic, horror"
+
+subject:
+  name: renoir_roses_lifecycle_v4
+  prompts:
+    - label: "A: bare stems"
+      prompt: >-
+        bare rose stems with green leaves and no flowers at all, gathered
+        in a porcelain vase on a marble side table, warm afternoon light,
+        warm grey studio ground, leafy greens and quiet browns, visible
+        brushstrokes
+    - label: "B: full bloom"
+      prompt: >-
+        pink roses in heavy full bloom, abundant overlapping petals
+        splayed wide with layered impasto, gathered in a porcelain vase
+        on a marble side table, warm afternoon light, warm grey studio
+        ground, creamy whites and deep rose with green leaves catching
+        highlights
+    - label: "C: withered dead"
+      prompt: >-
+        withered dead pink roses with shrivelled petals, brown curling
+        petals scattered across the marble side table, drooping dried
+        stems, in a porcelain vase, warm afternoon light, warm grey
+        studio ground, muted ochres and faded pinks, loose painterly
+        handling
+    - label: "A (return): bare stems"
+      prompt: >-
+        bare rose stems with green leaves and no flowers at all, gathered
+        in a porcelain vase on a marble side table, warm afternoon light,
+        warm grey studio ground, leafy greens and quiet browns, visible
+        brushstrokes
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 6
+  transition: 5
+  return_: 4
+  warmup: 3
+
+render:
+  structural_decay_radius: 0
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 24
+  quality: 5
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+output_dir: outputs

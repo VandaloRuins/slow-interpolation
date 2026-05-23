@@ -1,0 +1,66 @@
+# G1 / G2 smoke config for first-cold-run on Modal.
+#
+# NOT a production training config. Sole purpose: exercise the
+# trainer image, sd-scripts CLI conformance, and the volume mounts at
+# minimum cost.
+#
+# G1 (current settings): 1 epoch, 1 repeat, validation disabled.
+#   Pass = image builds, sd-scripts launches, at least one checkpoint
+#   lands on slow-interp-loras under runs/<run-id>/.
+#
+# G2 (flip the toggles below): 2 epochs, 2 repeats, 2 validation prompts.
+#   Pass = 2 checkpoints saved, validation contact sheet exists,
+#   manifest.lora_checkpoints non-empty.
+#
+# Promote to renoir_flowers.yaml after G2 passes. Delete this file
+# after G3 cold-run validates the trainer.
+
+trainer: kohya
+base_model: stabilityai/stable-diffusion-xl-base-1.0
+
+dataset:
+  zip: renoir-flowers-civitai.zip
+  trigger: rfl
+  caption_extension: .txt
+
+training:
+  network_rank: 16
+  network_alpha: 8
+  unet_lr: 3.0e-5
+  text_encoder_lr: 0
+  optimizer: adamw8bit
+  lr_scheduler: cosine_with_restarts
+  lr_scheduler_num_cycles: 1
+  batch_size: 2
+  gradient_accumulation: 4
+  repeats: 2
+  epochs: 2
+  save_every_n_epochs: 1
+  mixed_precision: bf16
+  min_snr_gamma: 5.0
+  gradient_checkpointing: true
+  caption_shuffle: false
+  caption_tag_dropout: 0
+  resolution: 1024
+  enable_bucket: true
+  min_bucket_reso: 768
+  max_bucket_reso: 1344
+  bucket_no_upscale: true
+  network_train_unet_only: true
+
+per_image_repeats: null
+
+modal:
+  gpu: L40S
+  timeout: 3600
+  retries: 0
+
+# G2: exercise the validation hook with 2 prompts on the 2 saved epochs.
+validation:
+  prompts:
+    - "rfl, a porcelain vase of pink roses on a marble side table, oil painting, impressionist"
+    - "rfl, a bouquet of mixed flowers in an earthenware pot, oil painting, impressionist"
+  render_at_epochs: [1, 2]
+  lora_scale: 0.80
+  seed: 0
+  output_format: contact_sheet

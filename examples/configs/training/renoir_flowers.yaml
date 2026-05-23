@@ -1,0 +1,83 @@
+# Renoir flowers LoRA, training config.
+#
+# Trains a Renoir-style SDXL LoRA on Modal using the same dataset
+# Luca packages for CivitAI: 97 image/caption pairs after the 5-image
+# hold-out (see docs/findings/lora-training.md §2).
+#
+# Hyperparameters mirror lora-training.md §3 row-by-row. This config
+# is the cold-run reference; if Modal output matches Luca's CivitAI
+# baseline on the 5 hold-out prompts, the trainer is correct.
+#
+# Run:
+#   modal run -m cloud.train_entrypoint --config examples/configs/training/renoir_flowers.yaml
+#
+# Expected cost on L40S: ~$0.85 to $1.20.
+
+trainer: kohya
+base_model: stabilityai/stable-diffusion-xl-base-1.0
+
+dataset:
+  zip: renoir-flowers-civitai.zip
+  trigger: rfl
+  caption_extension: .txt
+
+training:
+  network_rank: 16
+  network_alpha: 8
+  unet_lr: 3.0e-5
+  text_encoder_lr: 0
+  optimizer: adamw8bit
+  lr_scheduler: cosine_with_restarts
+  lr_scheduler_num_cycles: 4
+  batch_size: 2
+  gradient_accumulation: 4
+  repeats: 6
+  epochs: 10
+  save_every_n_epochs: 1
+  mixed_precision: bf16
+  min_snr_gamma: 5.0
+  gradient_checkpointing: true
+  caption_shuffle: false
+  caption_tag_dropout: 0
+  resolution: 1024
+  enable_bucket: true
+  min_bucket_reso: 768
+  max_bucket_reso: 1344
+  bucket_no_upscale: true
+  network_train_unet_only: true
+
+# Per-image repeats: schema reserved for v2. Leave null for v1.
+per_image_repeats: null
+
+modal:
+  gpu: L40S
+  timeout: 14400
+  retries: 0
+
+# Validation: render the 5 hold-out prompts from lora-training.md §2 on
+# the saved checkpoints at epochs 1, 5, and 10. Output one contact
+# sheet PNG (3 rows x 5 cols, 15 cells total) to the train-artifacts
+# volume.
+#
+# These prompts cover the full Renoir floral subject distribution
+# (canonical roses, mixed bouquet, off-distribution single-flower
+# family with anemones, chrysanthemums for minority-subject test,
+# potted geraniums as composition extrapolation).
+validation:
+  prompts:
+    - "rfl, a porcelain vase of pink roses on a marble side table, centered still life, soft natural daylight, blush pinks and ivory against a slate-grey background, visible brushstrokes, oil painting, impressionist"
+    - "rfl, a bouquet of mixed flowers in an earthenware pot, loose painterly handling, warm afternoon light, creamy whites and rose against a deep terracotta ground, oil painting, impressionist"
+    - "rfl, a bouquet of anemones in a small vase, cool studio light, blue-greys and lavenders with green leaves catching highlights, layered impasto petals, oil painting, impressionist"
+    - "rfl, a vase of chrysanthemums and a Japanese fan on a table, warm interior light, brick reds, terracotta and gilt, feathered brushwork on the leaves, oil painting, impressionist"
+    - "rfl, a planter of geraniums on a window ledge, dappled garden light, buttery cream and apricot tones, loose impressionist touch, oil painting, impressionist"
+  render_at_epochs: [1, 5, 10]
+  lora_scale: 0.80
+  seed: 0
+  output_format: contact_sheet
+
+# Publish renamed copies at the top of the slow-interp-loras volume so
+# cloud/validation_renoir.py loads them by convention. `{epoch}` is
+# substituted from the parsed epoch number. The runs/<run-id>/ copies
+# remain as the forensic record.
+publish:
+  checkpoint_template: "Renoir_Flowers_epoch_{epoch}.safetensors"

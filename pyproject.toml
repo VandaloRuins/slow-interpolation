@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slow-interpolation"
+version = "0.0.1"
+description = "Diffusion-based slow drift video: SDXL Lightning img2img chain, frequency-separated temporal smoothing, RIFE v4.25 64x linear interpolation."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Luca Martinelli (Vandalo Ruins)"}]
+keywords = ["diffusion", "sdxl", "rife", "interpolation", "generative-art", "lora"]
+dependencies = [
+    "torch",
+    "torchvision",
+    "diffusers>=0.30,<0.40",  # 0.38 verified; UNet-only LoRA fallback in keyframes.py covers 0.31+ Kohya text-encoder regression
+    "transformers",
+    "accelerate",
+    "peft",
+    "numpy",
+    "pillow",
+    "imageio",
+    "imageio-ffmpeg",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+train = ["datasets", "bitsandbytes"]
+live = ["mediapipe", "opencv-python"]
+dev = ["pytest", "ruff", "ipykernel"]
+# Optional cloud-render path. See docs/modal.md.
+# Install with: pip install -e .[cloud]
+# Modal SDK is intentionally NOT in core dependencies: users who never
+# run the cloud path do not pull this in.
+cloud = ["modal>=0.66"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

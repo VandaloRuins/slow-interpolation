@@ -1,0 +1,105 @@
+# Renoir pink-roses lifecycle, ~75 s loop. v7.
+#
+# v6 (banded noise + transition=7) hit Modal's 1h function timeout at 56
+# keyframes after ~3640s. v7 backs off the transition bump (7 -> 5, matching
+# v5) and keeps the banded-noise primary experiment. 4*6 + 3*5 + 10 + 1 = 50
+# keyframes, expected wall ~3250s on L40S. Fits under the 3600s timeout with
+# margin.
+#
+# This isolates Finding 3 cleanly: only the noise source changes vs v5. If
+# v7 closes the prompt-change blur, banded noise is the lever; if not, the
+# SLERP-blend chain-softness is intrinsic and the transition=7 bump or the
+# per-prompt lora_scale unfuse/refuse work is the next step.
+#
+# Recipe: Worley cd=3000 + Perlin fs=16 + low-weight FBM (the Round 4 Renoir
+# winner per docs/findings/noise-sources.md).
+
+style:
+  name: renoir_flowers_epoch_10
+  lora_path: models/loras/Renoir_Flowers_epoch_10.safetensors
+  lora_scale: 0.80
+  prefix: "rfl, "
+  suffix: ", oil painting, impressionist"
+  negative_prompt: "frame, vignette, panel, ornament, photograph, modern, sharp, photoreal, macabre, gothic, horror"
+
+subject:
+  name: renoir_roses_lifecycle_v7
+  prompts:
+    - label: "A: bare stems"
+      prompt: >-
+        a dormant rose plant with bare leafy stems and no flowers at all, just
+        green leaves and brown stems, gathered in a porcelain vase on a marble
+        side table, warm afternoon light, warm grey studio ground, leafy
+        greens and quiet browns, visible brushstrokes
+      negative_prompt: "roses, rose, blooms, bloom, flowers, flower, open petals, full bloom, splayed petals, lush flowers, petals, floral, blossoms, buds, pink, frame, vignette, panel, ornament, photograph, modern, sharp, photoreal"
+    - label: "B: full bloom"
+      prompt: >-
+        pink roses in heavy full bloom, abundant overlapping petals splayed
+        wide with layered impasto, gathered in a porcelain vase on a marble
+        side table, warm afternoon light, warm grey studio ground, creamy
+        whites and deep rose with green leaves catching highlights
+    - label: "C: withered dead"
+      prompt: >-
+        withered dead pink roses with shrivelled drooping petals, brown
+        curling petals scattered across the marble side table, drooping dried
+        stems, in a porcelain vase, warm afternoon light, warm grey studio
+        ground, muted ochres and faded pinks, loose painterly handling
+    - label: "A (return): bare stems"
+      prompt: >-
+        a dormant rose plant with bare leafy stems and no flowers at all, just
+        green leaves and brown stems, gathered in a porcelain vase on a marble
+        side table, warm afternoon light, warm grey studio ground, leafy
+        greens and quiet browns, visible brushstrokes
+      negative_prompt: "roses, rose, blooms, bloom, flowers, flower, open petals, full bloom, splayed petals, lush flowers, petals, floral, blossoms, buds, pink, frame, vignette, panel, ornament, photograph, modern, sharp, photoreal"
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 6
+  transition: 5
+  return_: 10
+  warmup: 3
+
+render:
+  structural_decay_radius: 0
+  return_pixel_blend_max: 0.55
+  return_strength_end: 0.45
+  noise:
+    kind: frequency_banded
+    params:
+      sources:
+        - kind: worley
+          params:
+            cell_density: 3000.0
+        - kind: perlin
+          params:
+            feature_size: 16.0
+        - kind: fbm
+          params:
+            feature_size: 64.0
+            octaves: 3
+      band_sigmas: [0.0, 0.0, 4.0]
+      band_weights: [0.5, 0.4, 0.1]
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 24
+  quality: 5
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+output_dir: outputs

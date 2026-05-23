@@ -1,0 +1,116 @@
+# Validation prompt set for the Soutine figures LoRA family.
+#
+# Render one epoch's grid:
+#   modal run -m cloud.validate_lora --config examples/configs/validation/soutine.yaml --epoch 10
+#
+# Trigger: `stn`. Trained on Soutine's figure portraits (boys,
+# butchers, hotel staff, choirboys, self-portraits). The dataset
+# captions emphasise twisted silhouettes, raw umber / smoke grey
+# grounds, dragging brushwork, expressionist handling.
+#
+# Two tracks:
+#   Track 1 (off-distribution): subjects Soutine did not paint or
+#   painted rarely (contemporary figures, atypical settings). Tests
+#   whether the style carries beyond his repertoire, the actual
+#   production use case for slow-interpolation drift videos.
+#   Track 2 (in-distribution hold-outs): classic Soutine portrait
+#   subjects. Tests whether the LoRA learned the idiom at all.
+#
+# Negative prompt is intentionally short. Soutine's style IS
+# distortion; suppressing it via negatives like "deformed" would
+# fight the LoRA.
+
+family: soutine-figures
+lora_filename_template: "Soutine_Figures_epoch_{epoch}.safetensors"
+default_epochs: [1, 5, 10]
+
+render:
+  width: 832
+  height: 1216
+  seed: 42
+  lora_scale: 0.85
+  guidance_scale: 1.5
+  num_inference_steps: 4
+  base_model: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight: sdxl_lightning_4step_lora.safetensors
+  taesd_vae: madebyollin/taesdxl
+
+negative_prompt: >
+  photograph, 3D render, anime, cartoon, digital art, smooth blending,
+  sharp edges, frame, border, signature, watermark, text
+
+tracks:
+  - name: off
+    label: "Track 1, contemporary / atypical figures (off-distribution)"
+    prompts:
+      - slug: O1-musician-violin
+        text: >
+          stn, a street musician with a violin under his chin, full body,
+          standing in a doorway, raw umber and smoke grey ground, the figure
+          carrying the warm key in dragged ochres and crimson, twisted
+          silhouette, charged surface, oil painting, expressionist
+      - slug: O2-old-woman-shawl
+        text: >
+          stn, an old woman in a heavy shawl, seated, head turned three-
+          quarters, indoor evening light from a single window, deep blue and
+          slate ground, the figure in ochre and dull rose, dragging brush,
+          twisted folds, charged surface, oil painting, expressionist
+      - slug: O3-fisherman-coat
+        text: >
+          stn, a fisherman in a heavy coat with a high collar, standing on
+          a quay, grey-green ground with churned brushwork suggesting sea
+          beyond, the figure in dark ochre and brick red, distorted
+          proportions, dragging brush, oil painting, expressionist
+      - slug: O4-cellist-seated
+        text: >
+          stn, a cellist seated with the instrument between the knees,
+          three-quarter view, warm umber ground, the figure in dark green
+          and ochre, twisted silhouette around the cello, dragged paint,
+          oil painting, expressionist
+      - slug: O5-young-woman-blue-dress
+        text: >
+          stn, a young woman in a blue dress, standing, hands clasped,
+          indoor studio light from the left, raw umber wall behind, the
+          figure in saturated cobalt and crimson, charged surface,
+          distorted proportions, oil painting, expressionist
+      - slug: O6-priest-cassock
+        text: >
+          stn, a parish priest in a black cassock, seated three-quarters,
+          dim interior light, smoke grey ground, the figure in pure black
+          with a white collar catching the light, twisted folds in the
+          cassock, dragging brush, oil painting, expressionist
+
+  - name: hold
+    label: "Track 2, classic Soutine subjects (in-distribution hold-outs)"
+    prompts:
+      - slug: H1-pageboy-uniform
+        text: >
+          stn, a page boy in a red uniform with brass buttons, standing
+          full body, hands at sides, indoor warm light, smoke grey ground,
+          the uniform in saturated red and ochre, twisted silhouette,
+          dragging brush, charged surface, oil painting, expressionist
+      - slug: H2-butchers-boy-apron
+        text: >
+          stn, a butcher's boy in a white apron stained with red, standing
+          full body, warm interior glow, smoke grey ground, the figure in
+          deep red and ochre, twisted silhouette, dragging brush, charged
+          surface, oil painting, expressionist
+      - slug: H3-chorister-surplice
+        text: >
+          stn, a choirboy in a white surplice over a red cassock, three-
+          quarter view, indoor studio light from the left, raw umber
+          ground, the figure carrying the warm key, dragged ochres and
+          reds, distorted proportions, oil painting, expressionist
+      - slug: H4-self-portrait
+        text: >
+          stn, self-portrait of a young painter, head and shoulders, three-
+          quarter view, raw umber ground, dark eyes catching the front-
+          light, the figure in dark green and ochre, charged surface,
+          twisted silhouette, dragging brush, oil painting, expressionist
+      - slug: H5-bellhop-seated
+        text: >
+          stn, a bellhop in a red jacket seated on a low stool, three-
+          quarter view, warm interior glow, smoke grey ground, the
+          uniform in saturated red and ochre, twisted folds, dragged
+          paint, charged surface, oil painting, expressionist
