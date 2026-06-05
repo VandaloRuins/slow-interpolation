@@ -8,9 +8,13 @@ This kickoff prompt is the bridge.
 
 ## How a student uses this page
 
-1. The student opens an AI-agent chat (Claude Code in the cloned repo directory is the default; any agent that can read local files works).
-2. The student copies the fenced block below.
-3. The student pastes it as their first message to the agent.
+The order matters. Doing these steps out of order is the most common failure mode at the workshop: the agent starts hunting the student's whole computer for a repo that isn't there yet, burning their free-tier tokens.
+
+1. **Clone the repo to your computer** (or download the ZIP from the GitHub page and unzip it):
+   `git clone https://github.com/VandaloRuins/slow-interpolation`
+2. **Open your AI agent** (Antigravity, Codex, Claude Code, Cursor) and use **File > Open Folder** to open the cloned `slow-interpolation` folder.
+   Note: opening a folder usually starts a fresh conversation in the agent. That is expected and correct. The kickoff prompt below is designed to be the first thing you say in that fresh conversation.
+3. **In that fresh conversation, paste the kickoff prompt below as your first message.**
 4. The agent reads the listed entry points, summarises what it can do, and asks the student what they want to make.
 
 That is the whole workflow. The student does not need to read [`docs/manual/`](manual/), [`docs/findings/`](findings/), or `.claude/agents/` themselves; the agent does that.
@@ -20,7 +24,16 @@ That is the whole workflow. The student does not need to read [`docs/manual/`](m
 ```
 You are an AI agent helping me operate the slow-interpolation repo on my behalf. The repo is a diffusion-based pipeline for slow, painterly looped video, designed so that I (the human) delegate the operational work to you (the agent) while I make the artistic decisions.
 
-Before doing anything, please read these entry points in order:
+FIRST CHECK before reading anything else: try to read README.md from your current working directory. If it does not exist, or if its first lines do not mention "slow-interpolation", STOP IMMEDIATELY. Do not search the filesystem. Do not guess where the repo might be. Do not run find / dir / Get-ChildItem to hunt for it. Reply only with this message and then stop:
+
+"I cannot see the slow-interpolation repo from this conversation. Please do these three steps:
+1. Clone the repo: git clone https://github.com/VandaloRuins/slow-interpolation  (or download the ZIP from https://github.com/VandaloRuins/slow-interpolation and unzip it).
+2. Open the cloned slow-interpolation folder in your agent. In Antigravity / Codex / Claude Code / Cursor this is File > Open Folder. This will usually start a fresh conversation without our current context. That is expected and correct.
+3. In that new conversation, paste this kickoff prompt again as your first message."
+
+Do not do anything else until I confirm I am in the cloned folder. Burning my tokens to hunt the filesystem is the failure mode this guard exists to prevent.
+
+Once README.md is readable from the current directory, please read these entry points in order:
 
 1. README.md (repo root): what the project is, the quickstart, the v0.1 status.
 2. AGENTS.md (repo root): the agent-facing entry point. Read the "Documentation audience convention", "Scan the manual before improvising", and "The four subagents" sections in particular.

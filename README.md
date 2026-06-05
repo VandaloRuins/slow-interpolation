@@ -77,7 +77,15 @@ This repo is meant to be forked, extended, and PR'd back into. **The documentati
 
 ### Workshops: the paste-able kickoff prompt
 
-If you are running a workshop with this repo, the orientation step is to have each student paste the **workshop kickoff prompt** at [`docs/workshop-kickoff.md`](docs/workshop-kickoff.md) as their first message to whichever AI agent they are using. The prompt orients the agent on the four subagents, the manual, and the v0.1 / v0.2 status, then asks the student what they want to make. Students never need to read the operational docs themselves; their agent does. Workshop facilitators can tailor the prompt per session (subject focus, time budget, dataset vs render emphasis); see the "Variants" section of the kickoff page.
+If you are running a workshop with this repo, the orientation step is to have each student paste the **workshop kickoff prompt** at [`docs/workshop-kickoff.md`](docs/workshop-kickoff.md) as their first message to whichever AI agent they are using.
+
+**Order matters.** A student must do these three steps in this order, or the agent will burn their free-tier tokens hunting their filesystem for a repo that is not there yet:
+
+1. **Clone the repo first**: `git clone https://github.com/VandaloRuins/slow-interpolation` (or download the ZIP from the repo page and unzip it).
+2. **Open the cloned folder in their agent** (Antigravity, Codex, Claude Code, Cursor) via File > Open Folder. Opening a folder usually starts a fresh conversation in the agent. That is expected and correct.
+3. **In that fresh conversation, paste the kickoff prompt as the first message.** The prompt has a guard at the top that refuses to do anything if it cannot see the repo from the current directory, so a misordered paste fails loudly instead of burning tokens.
+
+The prompt then orients the agent on the four subagents, the manual, and the v0.1 / v0.2 status, then asks the student what they want to make. Students never need to read the operational docs themselves; their agent does. Workshop facilitators can tailor the prompt per session (subject focus, time budget, dataset vs render emphasis); see the "Variants" section of the kickoff page.
 
 ### Forks and contributions
 
