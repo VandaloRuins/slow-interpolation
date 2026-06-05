@@ -18,7 +18,7 @@ You do NOT own:
 
 ## Routing: local vs Modal
 
-Run this first when a caller hands you a task. **Never default to Modal blindly.** The user's Modal credit is finite ($30/mo on the free Starter plan); local hardware is free. The right answer is often local.
+Run this first when a caller hands you a task. **Never default to Modal blindly.** The user's Modal credit is finite (either $5 one-time on no-card signup, or $30/month with card on file); local hardware is free. The right answer is often local.
 
 ### Workshop-context time thresholds
 
@@ -29,7 +29,7 @@ When the caller is a workshop student (signalled by the kickoff prompt at `docs/
 | Single image / contact-sheet render | **5 minutes** | A student watching a render dock for longer than 5 min has lost the demo's rhythm. |
 | Video loop (~60s clip) | **30 minutes** | Same logic at video scale. A student's session typically has 2 to 4 hours total; one render eating an hour kills the rest of the agenda. |
 
-If the local pre-flight predicts wall time above either threshold, **recommend Modal even when local is technically possible**. Workshop students forfeit time, not money; the $30/mo free credit absorbs the cost. Surface the math to the student transparently ("local would take ~22 min on your card vs ~90 s on Modal L40S at ~$0.05 of your free credit").
+If the local pre-flight predicts wall time above either threshold, **recommend Modal even when local is technically possible**. Workshop students forfeit time, not money; the free credit absorbs the cost (either the $5 no-card tier, ~108 60s loops, or the $30/month card-on-file tier, ~650 loops). Surface the math to the student transparently ("local would take ~22 min on your card vs ~90 s on Modal L40S at ~$0.05 of your free credit").
 
 ### Pre-flight check (cached at `outputs/_hardware.json` for 30 days)
 
@@ -92,7 +92,7 @@ Strong opinion: <local|Modal>, because <one-line reason>.
 Override?
 ```
 
-Wait for explicit confirmation before dispatching to Modal. The user has ~$30/mo of credit; surprise spending is bad. If you spawn 5 Modal jobs in a row without checking back, you have made a mistake even if each was small.
+Wait for explicit confirmation before dispatching to Modal. The user has finite credit ($5 no-card or $30/month with-card); surprise spending is bad, and on the $5 tier a single careless batch can exhaust the budget. If you spawn 5 Modal jobs in a row without checking back, you have made a mistake even if each was small. **On the $5 no-card tier, push back harder**: any dispatch above ~$0.50 should be confirmed.
 
 ### When to push back
 
@@ -139,7 +139,14 @@ If either signal returns "not configured" or "no auth", branch into account setu
 
 ### The signup flow
 
-Modal Starter plan is **free with $30/month of compute credit** (verified 2026-05-19). Signup is OAuth-only (GitHub or Google), no email/password form. At our measured render cost of $0.046 per 60s loop on L40S, the free credit covers approximately 650 loops per month, more than any workshop session needs.
+Modal Starter has **two free-credit doors** (verified 2026-06-05):
+
+| Path | What you get | Card required? | Workshop fit |
+|---|---|---|---|
+| **OAuth-only signup, no card** | $5 one-time credit (~108 loops at $0.046 each on L40S) | No | Sufficient for a 4-hour workshop session. **Default for students.** |
+| **OAuth + add a card** | $30/month of compute credit (~650 loops/month, card not charged within the free tier unless the user explicitly upgrades) | Yes | Take-home upgrade for ongoing work. Worth mentioning but not pushing live. |
+
+Signup is OAuth-only (GitHub or Google), no email/password form. **For workshop students, default to surfacing the no-card $5 path first**: it removes the card-on-file friction and is enough for the session. Mention the $30/month path as the take-home upgrade for anyone who wants to keep working at home.
 
 Use whichever browser-control capability your runtime has to walk the user through:
 
@@ -150,7 +157,7 @@ Use whichever browser-control capability your runtime has to walk the user throu
 Procedure (adapt to your runtime):
 
 1. **Open the signup page**: navigate to https://modal.com/signup.
-2. **Surface the offer to the user**: "Modal Starter is free with $30/month of compute credit. Signup is GitHub or Google OAuth, and Modal asks for a card on file at signup as identity verification (it does not charge the card; usage stays within the $30 free monthly credit unless you explicitly upgrade)."
+2. **Surface the offer to the user, defaulting to the no-card path for workshop students**: "Modal Starter has two free-credit doors. (a) Sign up with GitHub or Google OAuth and skip the card, get a one-time $5 credit which covers about 108 60s loops on L40S, enough for today's session. (b) Add a card on file and get $30/month of compute credit (card not charged within the free tier), good for ongoing work at home. For the workshop, I recommend (a); you can upgrade to (b) later if you want to keep going."
 3. **Wait for the user to complete OAuth**: the page redirects them to GitHub/Google for auth, then back to Modal where they pick a workspace name. This is a manual step; you cannot complete it for them.
 4. **After they confirm signup**: in the repo's terminal, run `modal token new`. This opens a browser to a Modal auth-bridge page where they confirm the local CLI is theirs. The token writes to `~/.modal.toml`.
 5. **Verify**: `modal token current` returns the workspace name. `modal run -m cloud.preflight` succeeds and reports volume state (likely empty for a new account).
