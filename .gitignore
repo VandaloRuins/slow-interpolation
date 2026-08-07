@@ -68,3 +68,35 @@ datasets/**/*.png
 datasets/**/*.json
 datasets/**/*.html
 datasets/**/*.txt
+
+# --- agent-ops-harness ---
+# The bundle at tools/agent-ops-harness/ and the runtime config ARE tracked: they are
+# generic, MIT, and part of how this repo is worked on. What stays local:
+#
+# The priorities / ops-state files live under docs/planning/private/ (already ignored
+# above). They carry release timing and work-in-progress state that the public
+# workshop-facing repo should not ship.
+#
+# The ship-gate session hooks are wired in .claude/settings.local.json so they fire on
+# the maintainer's machine only. A student cloning this repo gets no trunk-divergence
+# banner and no hook they did not ask for.
+.claude/settings.local.json
+
+# --- workshop deck working material (2026-08-07) ---
+# The deck lives in Canva; what lands on disk here is working scrap. deck-assets/
+# additionally mixes workshop media with a personal portrait and stills from a
+# separate project, so none of it ships from this public repo.
+canva-*.png
+canva-*.yml
+slow-interpolation-workshop.pptx
+renoir-dataset-mosaic.png
+workshop-qr.png
+deck-assets/
+
+# --- generated ---
+# Built by tools/gallery.py from whatever is in outputs/. Regenerate, never commit.
+gallery.html
+
+# Maintainer-local MCP servers (Canva, for the deck). Not part of the pipeline;
+# a student cloning this repo should not be offered a Canva server.
+.mcp.json

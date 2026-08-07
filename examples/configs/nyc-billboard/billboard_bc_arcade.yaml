@@ -1,0 +1,81 @@
+# LED wall delivery, screens B and C (horizontal). Companion to screen A.
+#
+# Target file: 1728 W x 540 H (16:5 landscape), 10.000 s, 30 fps, H.264.
+# Render source: 1536x896 (validated clean at edge_crop=0 on the Cole LoRA,
+# docs/findings/upscale-source-resolution.md), centre-crop 1536x480, lanczos
+# to 1728x540 (1.13x, better than the 1.25x production default).
+#
+# Direction: the horizontal counterpart of screen A. Where A is one arch, B/C
+# is the arcade: a rhythm of arches spanning the full width with the valley
+# burning through every opening. Same LoRA, same palette, same drift, so the
+# three screens read as one work seen twice.
+#
+# Motion: single slow drift, amber to gold and back, seamless loop.
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.75
+  prefix: "tcole, romantic landscape oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, decorative arch around the edge, vignette, text, watermark, signature, people, figures, modern buildings, signage, cars"
+
+subject:
+  name: billboard_bc_arcade
+  # Light term first, same CLIP 77-token reason as the screen A config.
+  prompts:
+    - label: "A: arcade amber"
+      prompt: >-
+        warm amber afternoon light, a long ruined Roman aqueduct arcade
+        spanning the full width, a rhythm of many crumbling brick arches
+        receding, dark weathered stone, luminous green valley and hazy blue
+        mountains through every opening
+    - label: "B: arcade golden"
+      prompt: >-
+        low golden hour light, a long ruined Roman aqueduct arcade spanning the
+        full width, a rhythm of many crumbling brick arches receding, dark
+        weathered stone, luminous valley and burning gold mountains through
+        every opening
+    - label: "A (return)"
+      prompt: >-
+        warm amber afternoon light, a long ruined Roman aqueduct arcade
+        spanning the full width, a rhythm of many crumbling brick arches
+        receding, dark weathered stone, luminous green valley and hazy blue
+        mountains through every opening
+
+resolution:
+  width: 1536
+  height: 896
+
+frames:
+  steady: 2
+  transition: 1
+  return_: 1
+  warmup: 3
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+
+output_dir: outputs/nyc-billboard

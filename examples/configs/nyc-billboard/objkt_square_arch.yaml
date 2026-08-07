@@ -1,0 +1,77 @@
+# Square key visual (1:1), third framing of the same work.
+#
+# Same subject and palette as the two LED-wall configs, composed for a square
+# frame rather than cropped out of them. Demonstrates the general rule: when
+# delivery targets are near-inverse aspect ratios, author separate compositions
+# rather than cropping one render, because the upscale factor becomes unusable.
+# A native 1024x1024 render beats a square crop of the 896x1536 portrait, which
+# would have thrown away the arch crown or the foreground.
+#
+# Deliverable: JPG under 1 MB, no text on it. Stills are pulled from this loop.
+#
+# NOT part of tonight's billboard obligation. Render only once A and B/C are done.
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.75
+  prefix: "tcole, romantic landscape oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, decorative arch around the edge, vignette, text, watermark, signature, people, figures, modern buildings, signage, cars"
+
+subject:
+  name: objkt_square_arch
+  # Light term first, CLIP 77-token discipline as per the billboard configs.
+  prompts:
+    - label: "A: arch amber"
+      prompt: >-
+        warm amber afternoon light, a ruined stone arch centred head on, massive
+        dark brickwork surrounding it, one bright opening at the centre
+        revealing a luminous distant valley, hazy blue mountains beyond
+    - label: "B: arch golden"
+      prompt: >-
+        low golden hour light, a ruined stone arch centred head on, massive dark
+        brickwork surrounding it, one burning gold opening at the centre
+        revealing a luminous distant valley, glowing mountains beyond
+    - label: "A (return)"
+      prompt: >-
+        warm amber afternoon light, a ruined stone arch centred head on, massive
+        dark brickwork surrounding it, one bright opening at the centre
+        revealing a luminous distant valley, hazy blue mountains beyond
+
+resolution:
+  width: 1024
+  height: 1024
+
+frames:
+  steady: 2
+  transition: 1
+  return_: 1
+  warmup: 3
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+
+output_dir: outputs/nyc-billboard

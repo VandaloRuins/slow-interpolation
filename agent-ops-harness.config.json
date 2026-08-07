@@ -1,0 +1,82 @@
+{
+  "project_name": "slow-interpolation",
+  "project_slug": "slow-interpolation",
+  "py": "python",
+
+  "paths": {
+    "kb_root": "docs/",
+    "priorities_file": "docs/planning/private/priorities.md",
+    "state_file": "docs/planning/private/ops-state.md",
+    "archive_dir": "docs/planning/history/",
+    "drafts_dir": null,
+    "mail_inbox": null,
+    "mail_sent": null,
+    "threads_index": null
+  },
+
+  "buckets": [
+    { "id": "pipeline", "label": "Pipeline & Technique",      "dated": false },
+    { "id": "release",  "label": "Releases & Packaging",      "dated": true  },
+    { "id": "docs",     "label": "Docs, Tooling & Infra",     "dated": false },
+    { "id": "standing", "label": "Standing",                  "dated": false }
+  ],
+
+  "hooks": {
+    "mail_fetch": null,
+    "active_threads": null
+  },
+
+  "git": {
+    "trunk": "auto",
+    "commit_email": "luca@vandalo.art",
+    "commit_name": "Luca Martinelli",
+    "claims_ttl_hours": 6,
+    "extra_deploy_surfaces": [],
+    "untracked_noise": [
+      ".playwright-mcp/",
+      "outputs/",
+      "datasets/",
+      "models/",
+      "train-artifacts/",
+      "local-spot-check/",
+      "pitch-materials/",
+      "__pycache__/"
+    ],
+    "secret_value_files": [".env", "CLAUDE.local.md", "docs/context.local.md"],
+    "secret_scan_skip": []
+  },
+
+  "routes": {
+    "graph": null,
+    "budget": "modal",
+    "dedupe": "docs-curator"
+  },
+
+  "registry": {
+    "source_of_truth": "docs/planning/source-of-truth-registry.md"
+  },
+  "project_registry": "docs/planning/workstream-registry.md",
+
+  "scan_roots": {
+    "living": [
+      "docs/**/*.md",
+      "README.md",
+      "AGENTS.md",
+      "CONTRIBUTING.md"
+    ],
+    "derived_indices": [
+      "docs/README.md",
+      "docs/manual/index.md",
+      "docs/planning/progress.md"
+    ],
+    "snapshots": [
+      "docs/planning/history/**",
+      "docs/planning/kickoff-prompt.md",
+      "docs/planning/pipeline-split-decision.md",
+      "docs/planning/private/v0.1-release-prep.md",
+      "docs/planning/private/canva-*.md",
+      "docs/planning/private/modal-followup-plan.md",
+      "docs/phase-2-acceptance.md"
+    ]
+  }
+}
