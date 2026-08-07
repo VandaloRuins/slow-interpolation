@@ -87,9 +87,11 @@ becomes a product row **here**, describing the feature, never the show.
 
 The grey zone is real and resolves on one question: *would this task still exist if the
 show did not?* A `lora_scale` bug is a product task even when a show surfaced it. Preparing
-a submission package is participation even when it uses the pipeline. Two directories in
-this repo sit on the participation side despite living under `docs/`: `docs/imaf-2026/` and
-`docs/nyc-billboard-2026/`. Never open priorities rows from them.
+a submission package is participation even when it uses the pipeline. Two such directories
+lived under `docs/` until 2026-08-07 (`docs/imaf-2026/`, `docs/nyc-billboard-2026/`); both
+were moved to `Ruins-agent`. Never open priorities rows from participation material, and if
+any reappears in this tree, hand it off rather than committing it. See the workstream
+registry's "Scope boundary" section, which is canonical for that routing.
 
 ---
 

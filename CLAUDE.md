@@ -134,9 +134,15 @@ The user (Luca) drives this project through natural language. When he says any o
 | "what lora_scale for X", "what epoch + scale for the Y render" | Invoke `lever` to consult the per-LoRA decisions-log entries. |
 | "is edge_crop: 0 safe for this LoRA", "should I crop borders for X" | Invoke `lever` for the per-LoRA risk check. |
 | "give me an expressionist preset", "give me a Renoir field preset", "show me the Y tuning cluster" | Invoke `lever` for a documented preset. |
+| **session orchestration (agent-ops harness)** | |
+| "what's on the list", "what should I work on", "check the todo", "priorities", "what's hot" | Invoke `/todo`. Sole writer of `docs/planning/private/priorities.md`. Propose, gate, apply: it never writes without an approved diff. |
+| "ingest this session", "capture what we did", "log this session", "close out the session" | Invoke `/ingest` (session close, Phase 1). Reconciles the priorities file against what this session established, then emits a `kb-sync-delta` block. |
+| "sync the docs", "propagate this everywhere", "we renamed X, fix the references", "the rest of the docs still say the old thing" | Invoke `/kb-sync` (session close, Phase 2). Consumes the delta block, propagates canon-first via `docs/planning/source-of-truth-registry.md`. **Separate approval from `/ingest`, never one bundled yes.** |
+| "log the code work", "route this to the right workstream", "which tracker owns this", "update the workstream logs" | Invoke `/platform-ingest`. Routes work items to the tracker named in `docs/planning/workstream-registry.md`. |
+| "commit this", "push this", "land this", "ship it" | `python tools/agent-ops-harness/shared/ship.py commit --paths <files> -m "msg" --push`. Never `git add -A`. Never name a directory in `--paths`. See "Landing work" below. |
 | **utility** | |
 | "check links", "link-check", "any broken links", "lint the docs links", "validate cross-references" | Run `python tools/check_doc_links.py` via Bash. Summarise count + categorise. |
-| "what's blocked", "what's gated on what", "what's waiting on X" | Read `docs/planning/progress.md` "Status at a glance" + workstream progress docs, summarise the dependency chain. |
+| "what's blocked", "what's gated on what", "what's waiting on X" | Read `docs/planning/private/priorities.md` FIRST (it owns blocked/awaiting state), then `docs/planning/progress.md` "Status at a glance" + workstream progress docs for the phase picture. Summarise the dependency chain. |
 | "resume operations", "let's resume", "what's the state" | Run the resume protocol: read progress.md top banner, list since-last-resume changes, surface pending parent-chat actions. |
 
 If a phrase plausibly matches more than one row, pick the row that fires the most specific action. If a phrase is genuinely ambiguous (rare), ask the user to disambiguate before acting. Do not pre-emptively fire if the user is mid-explanation; wait for a clear request.
@@ -144,3 +150,61 @@ If a phrase plausibly matches more than one row, pick the row that fires the mos
 New invocations get added here as patterns surface. The user can extend this map at any time by saying "from now on when I say X, do Y" or similar.
 
 **Audience convention for everything under `docs/`:** written for AI agents, not for human readers. README.md is the only human-facing doc; humans read it, then delegate to their agent. When you (or any parallel chat) writes a manual page, a finding, a reference, or a plan, address the agent in the second person, name what YOU (the agent) do vs what the USER does, and prefer operational decision tables over prose troubleshooting. The canonical examples are `docs/manual/dataset-curation.md` and `docs/manual/gallery.md`. Full rule in [AGENTS.md](AGENTS.md) "Documentation audience convention" + [docs/planning/docs-strategy.md](docs/planning/docs-strategy.md) "Audiences" section.
+
+## Session orchestration (agent-ops harness)
+
+Installed 2026-08-07 at `tools/agent-ops-harness/`, config at `agent-ops-harness.config.json`. Four skills plus a parallel-git gate. They are prose instruction sets; every project fact they need lives in the config, never in the prose.
+
+**Two files, two jobs, and they must not drift into each other:**
+
+| File | Owns | Never holds |
+|---|---|---|
+| `docs/planning/private/priorities.md` (gitignored) | Triage. What is due, what is blocked, what is awaiting a reply, escalation dates. Sole writer: `/todo`. | Narrative history. Phase-level status. |
+| `docs/planning/progress.md` (tracked) | The narrative record and the phase-level `Status at a glance` table. | Actionable rows. Never mark a priorities row done by editing this file. |
+
+**Scope: product only.** The priorities file tracks the pipeline, technique, code, docs, tooling, packaging and infrastructure. Festivals, shows, open calls, exhibitions, billboards, residencies and commissions belong to the `Ruins-agent` repo, which has its own priorities file. The test is *would this task still exist if the show did not?* A bug a show surfaced is product work; a submission package that uses the pipeline is not. Two participation directories lived under `docs/` until 2026-08-07 and were moved to `Ruins-agent`; if any reappears here, hand it off rather than committing it. This repo is public, so a client spec landing under `docs/` is a disclosure risk as well as a scope error.
+
+**Session close is two phases and two approvals.** `/ingest` reconciles the priorities file and emits a delta block; `/kb-sync` consumes that block and propagates each truth into the wider docs tree, canon-first, via `docs/planning/source-of-truth-registry.md`. The two approvals are never bundled into one yes: you may approve the ops rows and decline the docs cascade.
+
+**The two registries are the safety spine.** [source-of-truth-registry.md](docs/planning/source-of-truth-registry.md) says which document wins when two disagree, and which you are forbidden from writing (`budget` routes to the `modal` subagent, `dedupe` routes to `docs-curator`). [workstream-registry.md](docs/planning/workstream-registry.md) says which tracker owns which backlog. Read the relevant one before proposing a write.
+
+**One rule specific to a code repo:** for a parameter default, `src/slow_interpolation/**` wins over every doc. A doc claiming a default that the dataclass contradicts is the reconciliation target, never the other way round.
+
+**Public-repo constraint.** This repo is public and workshop-facing. Release timing, client and venue names, spend figures, parallel-project references and machine paths stay in `CLAUDE.local.md`, `docs/context.local.md` or `docs/planning/private/`, all gitignored. If a delta would put one of them in a tracked file, FLAG it instead of writing.
+
+### Landing work
+
+Trunk is `origin/main`. Close the loop with the ship gate, not plain git:
+
+```
+python tools/agent-ops-harness/shared/ship.py commit --paths <files> -m "msg" --push
+```
+
+It builds the commit on a temporary index parented on a freshly fetched trunk, so it never touches the working tree and cannot collide with a parallel chat. It informs rather than blocks, with one exception: a secret scan that exits 3 and commits nothing.
+
+- Land the moment approved edits are applied, same turn. Uncommitted edits in a shared tree are how two chats deadlock on one file.
+- Never `git add -A`. Name files in `--paths`, never directories, and read the `--dry-run` list first.
+- You do not need to be on `main` to commit to `main`.
+- `ship untracked` lists real content nobody ever committed; `ship contested` lists files carrying another chat's hunks. `ship rules` prints the full standard.
+
+The session hooks live in `.claude/settings.local.json` (gitignored), so they fire on the maintainer's machine only and a student cloning the repo inherits nothing.
+
+## Memory Doctrine
+
+Memory has three surfaces here and they are not interchangeable. The failure mode is writing *status* into memory, where it goes stale invisibly and no reconciliation routine can see it.
+
+| Surface | Location | Holds | Does NOT hold |
+|---|---|---|---|
+| Auto-memory | `~/.claude/projects/…-slow-interpolation/memory/` | Who Luca is, how he wants work done, standing facts about the project and its constraints, pointers to external resources. Loaded every session via `MEMORY.md`. | Task status, deadlines-as-todos, anything `priorities.md` owns. |
+| The docs tree | `docs/**` | Everything about the technique, pipeline, findings, manuals, workstreams. The durable record. | Session-scoped scratch. |
+| The code | `src/`, `cloud/`, `examples/configs/` | What the pipeline actually does and what a render actually used. | Intent and rationale, which belong in docs. |
+
+**Rules**
+
+1. **Status belongs in `priorities.md`, never in memory.** A memory saying "deadline 12 Aug" cannot be reconciled, will not be marked done, and will still read as urgent in November. Write the standing fact to memory and the dated obligation to the priorities file. This is not hypothetical: on 2026-08-07 the `Ruins-agent` repo was found holding three live dated obligations in auto-memory and in no tracked file at all.
+2. **One fact per file**, with frontmatter (`name`, `description`, `metadata.type` of `user` / `feedback` / `project` / `reference`). Add a one-line pointer to `MEMORY.md`. Never put memory content in `MEMORY.md` itself; it is an index.
+3. **Convert relative dates to absolute** before writing.
+4. **Check before you add.** Update the existing file rather than creating a near-duplicate; delete a memory that turns out to be wrong.
+5. **Do not save what the repo already records.** The pipeline spec belongs in `docs/pipeline.md`, a tuning lesson in `docs/findings/`. If asked to remember one of those, ask what was non-obvious about it and save that instead.
+6. **`/kb-sync` never writes memory.** It may FLAG a memory that contradicts canon; editing one is Luca's call.
+7. **Link liberally** with `[[name]]`. A link to a memory that does not exist yet marks something worth writing, not an error.

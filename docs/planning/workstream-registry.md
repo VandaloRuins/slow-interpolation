@@ -25,7 +25,7 @@ row's **Dialect**. When nothing matches, use the `(default)` row.
 | core-pipeline | `src/slow_interpolation/{config,keyframes,pipeline,prompts,run,smoothing,encoding,borders}.py`, `src/slow_interpolation/{core,interpolation,loras,live}/**` | `docs/planning/progress.md` | parent-chat session paragraph + a row in `## Status at a glance` if it moves a phase | parent chat | yes | the pipeline itself; no separate tracker by design |
 | docs-tree | `docs/README.md`, `docs/manual/index.md`, `docs/planning/docs-strategy.md`, cross-doc moves | (hand off) | - | `docs-curator` subagent | **no** (hand off) | structural moves are `docs-curator`'s call; emit a hand-off note |
 | harness | `tools/agent-ops-harness/**`, `agent-ops-harness.config.json`, `docs/planning/*-registry.md` | `docs/planning/progress.md` | one-line entry under the current session paragraph | parent chat | yes | installed 2026-08-07 |
-| festival / show participation | `docs/imaf-2026/**`, `docs/nyc-billboard-2026/**`, and any open-call, exhibition, commission or residency material | (hand off) | - | `Ruins-agent` repo | **no** (out of scope) | see "Scope boundary" below |
+| festival / show participation | any open-call, exhibition, commission, billboard or residency material, wherever in the tree it appears | (hand off) | - | `Ruins-agent` repo | **no** (out of scope) | no such material in-repo as of 2026-08-07; see "Scope boundary" below |
 | (default) | anything unmatched | `docs/planning/progress.md` | dated parent-chat session paragraph at the top of the narrative section | parent chat | yes | - |
 
 ### Columns
@@ -53,10 +53,17 @@ Test: *would this task still exist if the show did not?* If yes, it is product w
 belongs here. If no, hand it off. A bug that a show surfaced is still a product task; a
 submission package that uses the pipeline is still participation.
 
-`docs/imaf-2026/` and `docs/nyc-billboard-2026/` live in this repo but sit on the
-participation side. They are currently **untracked by git** - neither committed nor
-gitignored. That is a data-loss risk, not a routing question; raise it with Luca rather
-than resolving it yourself.
+Two directories used to sit here on the participation side, `docs/imaf-2026/` and
+`docs/nyc-billboard-2026/`. They were **moved out on 2026-08-07** to the `Ruins-agent` repo
+under `knowledge/grants&opencalls/{italia-media-art-festival,one-love-nyc-billboard}/`. Before
+the move, `conform.py` was promoted out of the billboard folder to `tools/conform.py` and
+de-personalised, because the delivery-conform pattern is generic product tooling even though
+the placement that produced it was not.
+
+The durable rule, which is what this row is really for: **participation material that appears
+in this repo gets handed off, not committed.** This repo is public, so a submission brief or a
+client spec landing under `docs/` is both a scope error and a disclosure risk. Move it to
+`Ruins-agent`, and keep only whatever generic tooling it produced.
 
 ## The public/private split
 
