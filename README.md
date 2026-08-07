@@ -67,7 +67,7 @@ L40S costs roughly 0.07 USD per 60s render. The `modal` subagent at [`.claude/ag
 ## v0.1 release status
 
 - **Shipping in v0.1**: the pipeline, the dataset-mosaic protocol, the Modal integration (renderer + trainer + validator), the four subagents, the manual, the findings. The Thomas Cole demo LoRA is published on HuggingFace Hub and downloaded automatically by the quickstart.
-- **Shipping in v0.2** (alongside the upcoming Renoir + Soutine art release): additional LoRAs (Casa del Suono fresco, Renoir flowers, Soutine figures), the compositing manual, the inpaint manual.
+- **Shipping in v0.2** (alongside the first art release, subject still under exploration): additional LoRAs (Casa del Suono fresco, Renoir flowers, Soutine figures), the compositing manual, the inpaint manual.
 
 See [`docs/planning/progress.md`](docs/planning/progress.md) for the live decisions log.
 

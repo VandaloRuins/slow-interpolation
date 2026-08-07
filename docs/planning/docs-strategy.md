@@ -172,7 +172,7 @@ Adds on top of the current tree. No file moves. No mid-flight disruption.
 
 ### Phase D3 - one-shot reorganisation (post-Renoir release)
 
-After the objkt labs Renoir release ships and the in-flight workstreams have closed:
+After the first art release ships and the in-flight workstreams have closed:
 
 1. Move `docs/pipeline.md` -> `docs/manual/pipeline.md`. Polish for external read.
 2. Move `docs/technique.md`, `docs/context.md`, `docs/inventory.md`, `docs/outputs.md`, `docs/dependencies.md`, `docs/dev-setup.md`, `docs/roadmap.md` -> `docs/reference/`.

@@ -121,7 +121,7 @@ Save every epoch. Discard most. For the slow-interpolation pipeline we need exac
 | Checkpoint | When to use | Pipeline scale |
 |---|---|---|
 | `Renoir_Flowers_epoch_1.safetensors` | Light style — Renoir atmosphere on non-floral or partly-floral subjects (the Renoir LoRA running on landscape-with-flowers prompts, fresco-fragment prompts, anywhere we want Renoir colour without full pastiche) | `lora_scale: 0.40 to 0.60` |
-| `Renoir_Flowers_epoch_10.safetensors` | Strong style — direct Renoir floral pastiche, the objkt labs release primary subjects | `lora_scale: 0.70 to 0.90` |
+| `Renoir_Flowers_epoch_10.safetensors` | Strong style — direct Renoir floral pastiche, vases and bouquets | `lora_scale: 0.70 to 0.90` |
 
 The intermediate epochs (2 to 9) are training byproducts. Keep them archived for diagnostic re-renders if epoch 10 over-cooks or epoch 1 under-cooks; otherwise unused at inference.
 
@@ -224,7 +224,7 @@ subjects:
 | Render intent | lora_scale | Notes |
 |---|---|---|
 | Pure Renoir release piece (bouquet of roses, vase of mixed flowers, anemones) | 0.75 to 0.85 | Default release range. 0.80 is the working median. |
-| Slow drift across three rose-bouquet prompts (the objkt labs primary loop) | 0.75 | Lower end of the range; the prompt scaffolding does the heavy lifting, the LoRA holds palette. |
+| Slow drift across three rose-bouquet prompts | 0.75 | Lower end of the range; the prompt scaffolding does the heavy lifting, the LoRA holds palette. |
 | Renoir on a Cole-style landscape (cross-stylesheet exploration) | 0.90 to 1.00 | See subject-distance note. The Renoir LoRA on a landscape is off-distribution and needs to be pushed up. |
 | Renoir on a Casa del Suono fresco (cross-LoRA experiment) | 0.85 to 1.00 | Mix at your own risk. Untested combination. |
 | Subtle Renoir-tinged palette overlay on non-floral subjects | 0.55 to 0.65 + epoch 1 checkpoint | Use the light checkpoint. |
@@ -290,7 +290,7 @@ Optional additions when you want the LoRA to behave specifically:
 - `+ fruit, peaches, oranges, onions` — if the LoRA over-pulls from the still-life-with-fruit subset.
 - `+ portrait, woman, figure, child` — defensive against the small set of fleurs-et-femme leak-throughs.
 
-## 9. Sign-off checklist (before objkt labs release renders)
+## 9. Sign-off checklist (before any release-grade renders)
 
 - [ ] CivitAI training completed, all 10 epoch checkpoints downloaded.
 - [ ] Visual review of validation hold-out at epoch 1, 5, 10 (subjective grade by Luca).

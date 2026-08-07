@@ -25,7 +25,7 @@ Endpoint: [`fal-ai/flux-lora/inpainting`](https://fal.ai/models/fal-ai/flux-lora
 
 **Cons**
 - Requires the Renoir LoRA to exist first. Without it, falls back to FLUX's default impressionist understanding, which is decent but not Renoir-specific.
-- FLUX [dev] license restricts certain commercial uses; check the licence for objkt labs release context. The [pro] variant has clearer commercial terms but costs more.
+- FLUX [dev] license restricts certain commercial uses; check the licence against your intended release context. The [pro] variant has clearer commercial terms but costs more.
 - LoRA loading adds 3 to 5 seconds of cold-start latency per first call after idle.
 
 **Best for:** post-Renoir-LoRA, all in-dataset cleanup (signatures, lot numbers, cat in the corner of `fleurs-et-chats`, the maillol-statuette study in some Renoir prints). Default tier-1 choice.
@@ -191,7 +191,7 @@ Endpoint: [`fal-ai/flux-krea-lora/inpainting`](https://fal.ai/models/fal-ai/flux
 
 **Phase 2 (post-Renoir-LoRA):** swap the endpoint to tier 1 (fal.ai FLUX [dev] Inpainting with LoRAs). Pass the CivitAI URL of `Renoir_Flowers_epoch_10.safetensors`, prompt prefixed with `rfl, ...`. Same gallery hook, different endpoint URL. This is where the style matching becomes near-indistinguishable from the artist's own hand.
 
-**Phase 3 (release polish):** for the 3 to 5 most-important paintings of the objkt labs release, drop into tier 11 (local ComfyUI + FLUX Fill + Renoir LoRA + IP-Adapter referencing the rest of the painting). Iterate at zero marginal cost; pick the best seed; lock the result. The slow-interpolation project's aesthetic of "the image is allowed to take its time" applies to the cleanup pass too — sometimes the right inpaint takes 20 seeds, and that is fine when each seed costs nothing.
+**Phase 3 (release polish):** for the 3 to 5 most-important paintings of a release set, drop into tier 11 (local ComfyUI + FLUX Fill + Renoir LoRA + IP-Adapter referencing the rest of the painting). Iterate at zero marginal cost; pick the best seed; lock the result. The slow-interpolation project's aesthetic of "the image is allowed to take its time" applies to the cleanup pass too — sometimes the right inpaint takes 20 seeds, and that is fine when each seed costs nothing.
 
 ## Gallery integration sketch
 

@@ -11,7 +11,7 @@ models/
   loras/
     Thomas_Cole_epoch_10.safetensors   ~218 MB, default for After Cole renders
     Thomas_Cole_epoch_1.safetensors    ~218 MB, light style fallback
-    <renoir-flowers>.safetensors        when trained, for objkt labs release
+    <renoir-flowers>.safetensors        trained; see findings/lora-training.md
     <other domain LoRAs>.safetensors
 ```
 

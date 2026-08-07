@@ -22,11 +22,13 @@ The technique began as a way to make Italian fresco paintings move at the pace o
 
 Generative video in 2026 mostly tries to behave like cinema, motion-graphics, or VFX. `slow-interpolation` tries to make it behave like a 19th-century oil painting reconsidered as time-based media. The contemporary question underneath: what happens when a diffusion model is allowed, even forced, to take its time?
 
-## The Renoir flowers release (objkt labs)
+## The first release
 
-The first release built on top of this consolidated toolkit is planned for the objkt labs Spring 2026 residency (curated release on Tezos). The subject will be a Renoir flowers LoRA, used inside the same pipeline.
+The first body of work built on this consolidated toolkit is **under exploration**. The subject and the style LoRA are both open questions, deliberately, while the technique's output quality is being tested rather than assumed.
 
-The choice is deliberate. Impressionist floral painting is itself about slow perception: light changing on the same vase across an afternoon. Pairing it with a technique that refuses to settle gives the release a single legible thesis: a painter who tried to hold a moment, run through a system that refuses to hold any.
+The original direction was a Renoir flowers LoRA used inside the same pipeline, and the reasoning behind it is worth keeping even though it is no longer the assumed answer. Impressionist floral painting is itself about slow perception: light changing on the same vase across an afternoon. Pairing it with a technique that refuses to settle gives a release a single legible thesis, a painter who tried to hold a moment run through a system that refuses to hold any.
+
+That thesis is a property of the pairing, not of Renoir specifically. Any style whose own subject is instability (light destroying form, paint behaving as weather) satisfies it. Which one carries the first release is the open question.
 
 ## Glossary
 

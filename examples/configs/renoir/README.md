@@ -1,6 +1,6 @@
 # Renoir LoRA config templates
 
-Placeholder configs for the Renoir floral release on objkt labs. Schema is
+Placeholder configs for the Renoir floral subjects. Schema is
 production-ready; the LoRA file (`models/loras/Renoir_Flowers_epoch_10.safetensors`)
 is **not yet checked in** because training is still running in a separate chat.
 

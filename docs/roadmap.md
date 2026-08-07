@@ -37,7 +37,9 @@ Exit criteria: `python -m slow_interpolation.run examples/configs/tcole_valley.y
 
 ## Phase 3. Renoir flowers LoRA + expanded scope (in flight, 2026-05-15 onward)
 
-The first new body of work, and the objkt labs release content. Scope expanded 2026-05-15 to include offline-scope noise research (formerly Phase 4.1) and offline dual-prompt compositing (formerly Phase 4.3). Live work stays in Phase 4.
+The first new body of work. Scope expanded 2026-05-15 to include offline-scope noise research (formerly Phase 4.1) and offline dual-prompt compositing (formerly Phase 4.3). Live work stays in Phase 4.
+
+**Which style carries the first release is an open question.** Renoir flowers was the original direction and the LoRA is trained and validated, but the release subject is under exploration rather than settled. This phase's deliverables (the LoRA, the dataset protocol, the noise work, the configs) stand on their own regardless of which style ships.
 
 - Build dataset under `datasets/renoir-flowers/` (102 paintings curated, captioned, CivitAI ZIP ready as of 2026-05-17).
 - Train the LoRA on CivitAI, same playbook as Thomas Cole. In flight in a separate chat.
