@@ -105,6 +105,32 @@ class ControlConfig:
 
 
 @dataclass
+class MotionConfig:
+    """Masked directional motion: one region physically moves, the rest does not.
+
+    A second axis of change, independent of the light drift. See `motion.py` for
+    why RIFE renders this correctly rather than blurring it: flow is non-zero
+    over the displaced region and exactly zero over the static one, so water
+    moves and rock stays sharp without either being asked to.
+
+    `dy` is pixels PER KEYFRAME, positive downward, applied cumulatively as the
+    chain walks. Keep it inside what optical flow can track across one pair:
+    `dy` spread over `frames_per_pair` invented frames is the per-frame speed,
+    and a few pixels per frame is comfortable. Large steps reintroduce exactly
+    the blur `passes` was lowered to fix.
+
+    The mask comes from the control map's dark region by default, which is where
+    water already lives by convention, so no new asset is needed.
+    """
+
+    dx: int = 0
+    dy: int = 0
+    mask_threshold: int = 60
+    mask_feather: int = 24
+    mask_invert: bool = False
+
+
+@dataclass
 class StyleConfig:
     """Domain LoRA + textual style scaffold.
 
@@ -339,6 +365,7 @@ class PipelineConfig:
     resolution: ResolutionConfig = field(default_factory=ResolutionConfig)
     sampling: SamplingConfig = field(default_factory=SamplingConfig)
     control: ControlConfig | None = None
+    motion: MotionConfig | None = None
     rife: RIFEConfig = field(default_factory=RIFEConfig)
     encoding: EncodingConfig = field(default_factory=EncodingConfig)
     borders: BorderSuppressionConfig = field(default_factory=BorderSuppressionConfig)
@@ -457,6 +484,7 @@ def load_pipeline_config(path: str | Path) -> PipelineConfig:
         if cd.get("images"):
             cd["images"] = [Path(p).expanduser() for p in cd["images"]]
         control = ControlConfig(**cd)
+    motion = MotionConfig(**raw["motion"]) if raw.get("motion") else None
     rife = _build_rife(raw.get("rife"))
     encoding = EncodingConfig(**raw["encoding"]) if "encoding" in raw else EncodingConfig()
     borders = _build_borders(raw.get("borders"))
@@ -478,6 +506,7 @@ def load_pipeline_config(path: str | Path) -> PipelineConfig:
         resolution=resolution,
         sampling=sampling,
         control=control,
+        motion=motion,
         rife=rife,
         encoding=encoding,
         borders=borders,

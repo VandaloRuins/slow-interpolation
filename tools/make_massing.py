@@ -236,7 +236,9 @@ SKYLINES = {
 }
 
 
-def build_stage_depth(w: int, h: int, stage: str = "modern") -> Image.Image:
+def build_stage_depth(w: int, h: int, stage: str = "modern", *,
+                      liberty: bool = True, crag_cx: float | None = None,
+                      mirror: bool = False) -> Image.Image:
     """Harbour depth map: two FIXED land strips with unconstrained water between.
 
     Redesigned after v4. Earlier versions gave the water a grey depth ramp, and
@@ -258,6 +260,21 @@ def build_stage_depth(w: int, h: int, stage: str = "modern") -> Image.Image:
     Only the skyline standing ON Manhattan's strip changes per stage. That makes
     the horizon and both waterlines fixed for the whole cycle while the five
     stages play out on top of them.
+
+    THE VALUE DISTRIBUTION IS THE LOAD-BEARING PART, not the geometry. Measured
+    on the maps that worked: ~56 to 66% black, ~21% above 200, the rest mid.
+    The delivery-aspect maps authored on 2026-08-09 kept a similar black
+    fraction but pushed the near field to 48 to 54% above 200, and both renders
+    came back with an enormous foreground mass and the horizon shoved out of
+    frame. A depth map that is half maximum-brightness says "a wall directly in
+    front of the camera", and the model paints one. Keep the near field near a
+    fifth of the frame.
+
+    `liberty` draws the colossal statue on her island (Course of Empire cycle);
+    off for compositions that have no statue in them. `crag_cx` moves the
+    landmark's centre, which a narrow portrait crop needs since the default sits
+    at the far left and would fall outside a central column. `mirror` flips it
+    to the opposite side so two screens can face each other.
     """
     img = Image.new("RGB", (w, h), (0, 0, 0))
     d = ImageDraw.Draw(img)
@@ -277,7 +294,7 @@ def build_stage_depth(w: int, h: int, stage: str = "modern") -> Image.Image:
 
     # Liberty on her island, in the bay. Present from arcadian, broken by V.
     base = stage.replace("_haze", "")
-    if base != "savage":
+    if base != "savage" and liberty:
         lx, ly = int(w * 0.30), int(h * 0.635)
         top = 0.150 if base != "desolation" else 0.070
         d.ellipse([lx - int(w * 0.030), ly - int(h * 0.012),
@@ -308,10 +325,17 @@ def build_stage_depth(w: int, h: int, stage: str = "modern") -> Image.Image:
                (w, shore_y - int(h * 0.008)), (w, shore_y + 30), (0, shore_y + 30)],
               fill=(200, 200, 200))
 
-    # THE CRAG: the fixed reference, rising from the near shore.
-    d.polygon([(int(w * 0.055), h), (int(w * 0.020), int(h * 0.735)),
-               (int(w * 0.098), int(h * 0.585)), (int(w * 0.175), int(h * 0.730)),
-               (int(w * 0.225), h)], fill=(246, 246, 246))
+    # THE CRAG: the fixed reference, rising from the near shore. Authored around
+    # a centre of 0.1225w; `crag_cx` slides that whole profile sideways so a
+    # narrow crop can still contain it, and `mirror` reflects it.
+    crag = [(0.055, 1.000), (0.020, 0.735), (0.098, 0.585), (0.175, 0.730),
+            (0.225, 1.000)]
+    shift = (crag_cx - 0.1225) if crag_cx is not None else 0.0
+    pts = []
+    for fx, fy in crag:
+        x = fx + shift
+        pts.append((int(w * (1.0 - x)) if mirror else int(w * x), int(h * fy)))
+    d.polygon(pts, fill=(246, 246, 246))
 
     return img.filter(ImageFilter.GaussianBlur(4))
 
@@ -421,6 +445,59 @@ def build_portal_depth(w: int, h: int) -> Image.Image:
     return img.filter(ImageFilter.GaussianBlur(4))
 
 
+def build_fall_depth(w: int, h: int) -> Image.Image:
+    """Screen A, 1:3 portrait. A gorge with a fall down the middle.
+
+    Built for `motion`: the MASK comes from this map's dark region, so the
+    black channel down the centre is doing two jobs at once. It tells
+    ControlNet "unconstrained, paint what the prompt says here", and it tells
+    the motion pass "this is what moves". The bright cliffs either side are
+    therefore both the pinned structure and the static region, with no separate
+    mask asset needed.
+
+    Cliff values RAMP from bright at the outer frame edge to mid at the channel
+    lip, rather than sitting flat and bright. Two reasons. A gorge wall really
+    does recede from the viewer, so a flat value reads as a slab. And a flat
+    bright cliff would put more than half the frame above value 200, which is
+    the exact fault that made the first delivery maps paint an enormous near
+    mass with the horizon shoved out of frame. Target is ~21% near, matching
+    the maps that worked.
+
+    The delivered 1:3 column is the central 506 px of 896, so the channel is
+    sized to fill roughly the middle two thirds of what actually ships.
+    """
+    img = Image.new("RGB", (w, h), (0, 0, 0))
+    d = ImageDraw.Draw(img)
+
+    chan_l, chan_r = int(w * 0.34), int(w * 0.66)
+
+    # Cliffs, ramping away from the viewer toward the channel.
+    for x in range(chan_l):
+        f = x / max(1, chan_l)
+        v = int(246 - 126 * f)
+        d.line([(x, 0), (x, h)], fill=(v, v, v))
+    for x in range(chan_r, w):
+        f = (x - chan_r) / max(1, w - chan_r)
+        v = int(120 + 118 * f)
+        d.line([(x, 0), (x, h)], fill=(v, v, v))
+
+    # THE CHANNEL stays black top to bottom: the fall itself, unconstrained.
+    d.rectangle([chan_l, 0, chan_r, h], fill=(0, 0, 0))
+
+    # The lip: a rock ledge the water comes over, mid value so it reads as a
+    # far edge rather than as something standing in front of the fall.
+    d.rectangle([chan_l, 0, chan_r, int(h * 0.055)], fill=(96, 96, 96))
+
+    # Plunge basin at the foot, near and bright, catching the fall. Kept low so
+    # it does not eat the near-value budget.
+    for y in range(int(h * 0.93), h):
+        f = (y - h * 0.93) / max(1.0, h - h * 0.93)
+        v = int(196 + 56 * f)
+        d.line([(0, y), (w, y)], fill=(v, v, v))
+
+    return img.filter(ImageFilter.GaussianBlur(4))
+
+
 def build_wide_depth(w: int, h: int, stage: str = "savage",
                      mirror: bool = False, band: int = WIDE_BAND_PX) -> Image.Image:
     """Screens B and C, 16:5. The same headland vantage, before and after.
@@ -504,7 +581,7 @@ def main() -> int:
                     help="emit a ControlNet depth map instead of a tonal sketch")
     ap.add_argument("--stage", choices=list(SKYLINES), default=None,
                     help="emit a per-stage harbour depth map")
-    ap.add_argument("--scene", choices=["bowtie", "harbor", "portal", "wide"], default="bowtie",
+    ap.add_argument("--scene", choices=["bowtie", "harbor", "portal", "wide", "fall"], default="bowtie",
                     help="bowtie = Times Square; harbor = the Narrows from a headland; "
                          "portal = LED screen A (1:3); wide = LED screens B/C (16:5)")
     ap.add_argument("--wide-stage", choices=["savage", "desolation"], default="savage",
@@ -513,6 +590,10 @@ def main() -> int:
                     help="--scene wide only: put the crag right instead of left (screen C)")
     ap.add_argument("--band", type=int, default=WIDE_BAND_PX,
                     help="--scene wide only: last render row that survives the 16:5 crop")
+    ap.add_argument("--no-liberty", action="store_true",
+                    help="--stage only: omit the colossal statue")
+    ap.add_argument("--crag-cx", type=float, default=None,
+                    help="--stage only: move the crag's centre, as a fraction of width")
     ap.add_argument("--soften", type=int, default=0,
                     help="extra blur radius; use ~14 to stop ControlNet tracing edges")
     ap.add_argument("--width", type=int, default=1344)
@@ -520,13 +601,17 @@ def main() -> int:
     args = ap.parse_args()
     args.out.parent.mkdir(parents=True, exist_ok=True)
     if args.stage:
-        out = build_stage_depth(args.width, args.height, args.stage)
+        out = build_stage_depth(args.width, args.height, args.stage,
+                                liberty=not args.no_liberty, crag_cx=args.crag_cx,
+                                mirror=args.mirror)
         if args.soften:
             out = soften(out, args.soften)
         out.save(args.out)
         print(f"{args.width}x{args.height} {args.stage} depth map -> {args.out}")
         return 0
-    if args.scene == "portal":
+    if args.scene == "fall":
+        out = build_fall_depth(args.width, args.height)
+    elif args.scene == "portal":
         out = build_portal_depth(args.width, args.height)
     elif args.scene == "wide":
         out = build_wide_depth(args.width, args.height, args.wide_stage,
@@ -542,7 +627,7 @@ def main() -> int:
     if args.soften:
         out = soften(out, args.soften)
     out.save(args.out)
-    if args.scene in ("portal", "wide"):
+    if args.scene in ("portal", "wide", "fall"):
         kind = f"{args.scene} depth map"
     else:
         kind = "depth map" if args.depth else "massing sketch"

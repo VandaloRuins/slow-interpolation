@@ -21,6 +21,7 @@ from PIL import Image, ImageFilter
 
 from .borders import make_edge_suppression_callback
 from .config import PipelineConfig
+from .motion import build_motion_mask, displace
 from .noise import EvolvedNoiseWalk, NoiseSource
 from .prompts import encode_prompt, slerp_embeddings
 
@@ -256,6 +257,7 @@ def generate_keyframes(
         return {"negative_prompt_embeds": ne, "negative_pooled_prompt_embeds": np_}
 
     n_segments = len(subject.prompts) - 1
+
     current_img = _random_noise_image(res.width, res.height, config.seed)
     # One generator threaded through every call, so the SEQUENCE of samples is
     # what is reproducible, not each call in isolation. Left None the sampler
@@ -281,6 +283,32 @@ def generate_keyframes(
         if ctrl_maps:
             print(f"[keyframes] {len(ctrl_maps)} control map(s), "
                   f"{'cross-faded per stage' if len(ctrl_maps) > 1 else 'fixed'}")
+
+    # Masked directional motion. Built once: the mask is derived from the first
+    # control map's dark region, which is where water already lives by the
+    # convention settled after v4. Displacement is applied to the PREVIOUS frame
+    # before the noise blend, so the noise walk's temporal persistence is not
+    # dragged around with the water. See motion.py.
+    motion_cfg = getattr(config, "motion", None)
+    motion_mask = None
+    if motion_cfg is not None and (motion_cfg.dx or motion_cfg.dy):
+        if not ctrl_maps:
+            raise ValueError(
+                "motion needs a control map to derive its mask from; set control.image"
+            )
+        motion_mask = build_motion_mask(
+            ctrl_maps[0], (res.width, res.height),
+            threshold=motion_cfg.mask_threshold,
+            feather=motion_cfg.mask_feather,
+            invert=motion_cfg.mask_invert,
+        )
+        print(f"[keyframes] motion dx={motion_cfg.dx} dy={motion_cfg.dy} per keyframe, "
+              f"mask covers {100 * float(motion_mask.mean()):.1f}% of the frame")
+
+    def _move(img: Image.Image) -> Image.Image:
+        if motion_mask is None:
+            return img
+        return displace(img, motion_mask, motion_cfg.dx, motion_cfg.dy)
 
     def _ctrl_at(seg: int, t: float) -> Image.Image | None:
         """Control map for a frame at SLERP position `t` within segment `seg`.
@@ -387,7 +415,7 @@ def generate_keyframes(
                 current_img, anchor_img, render.anchor_reassert
             )
             input_img = noise_walker.blend(
-                _structural_decay(base, render.structural_decay_radius),
+                _move(_structural_decay(base, render.structural_decay_radius)),
                 blend_pct=render.steady_noise_blend,
             )
             current_img = _pipe_call(input_img, embeds_cur, pooled_cur, cfg_kw, strength,
@@ -421,7 +449,7 @@ def generate_keyframes(
                 current_img, anchor_img, render.anchor_reassert
             )
             input_img = noise_walker.blend(
-                _structural_decay(base, render.structural_decay_radius),
+                _move(_structural_decay(base, render.structural_decay_radius)),
                 blend_pct=render.transition_noise_blend,
             )
             current_img = _pipe_call(input_img, blended_embeds, blended_pooled, cfg_kw,
