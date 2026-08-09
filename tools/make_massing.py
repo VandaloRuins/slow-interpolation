@@ -316,6 +316,171 @@ def build_stage_depth(w: int, h: int, stage: str = "modern") -> Image.Image:
     return img.filter(ImageFilter.GaussianBlur(4))
 
 
+# ---------------------------------------------------------------------------
+# Delivery-aspect maps for the LED wall. These are NOT adaptations of the 16:9
+# harbour map above; they are re-authored, because the delivery crops discard
+# most of the frame the harbour armature lives in.
+#
+#   Screen A   render 896x1536, edge_crop 8, crop 506x1520 at x=187
+#              -> only the CENTRAL 506 px column is delivered
+#   Screen B/C render 1536x896, edge_crop 8, crop 1520x474 at y=0
+#              -> only the TOP 474 px is delivered, i.e. y 8..482 of 896
+#
+# The harbour map puts the near shore at 0.78h and the crag from 0.585h down.
+# All of that falls below the B/C cut. Everything here is authored against the
+# region that survives, and the rest of the frame is paint-out that supports
+# the visible sliver and is then thrown away.
+# ---------------------------------------------------------------------------
+
+# Where the delivered band ends, in render pixels, for the 16:5 screens. The
+# crop takes y 0..474 of the edge-cropped frame, which is y 8..482 of the
+# render. Author to 482 and the last few pixels are margin.
+WIDE_BAND_PX = 482
+
+# Broken stumps on the far shore for stage V. Left of centre so they never
+# collide with the crag, which sits right in screen C. (x0, width, height) as
+# fractions of the width and of the delivered band.
+DESOLATION_STUMPS = [
+    (0.200, 0.030, 0.081), (0.300, 0.024, 0.128), (0.400, 0.020, 0.069),
+    (0.520, 0.026, 0.107), (0.640, 0.022, 0.056),
+]
+
+# Stump value against the far shore's 84. v9 used a 6-point separation on a
+# 768-tall frame where the towers ran to 0.395h; here they are 27 to 62 px in
+# an 896-tall frame, so 6 points is invisible to ControlNet and the map asserts
+# nothing. 112 separates them clearly while staying far below the crag's 246,
+# and five low masses is still inside v9's "fewer, larger" rule.
+STUMP_VALUE = 112
+
+
+def build_portal_depth(w: int, h: int) -> Image.Image:
+    """Screen A, 1:3 portrait. The view BACK, from inside the empire.
+
+    A 1:3 frame composes in horizontal bands, not vertical ones. Two earlier
+    versions of this map got that backwards. The first put piers left and
+    right, a lintel above and steps below, all at 232 to 250; after softening
+    they merged into one continuous white surround and the map was literally a
+    picture frame, which is the artifact `negative_prompt` has fought since the
+    empire run. The second replaced them with a near column and a receding one,
+    which subdivided a 506 px delivered band into four ~125 px vertical zones
+    and read as stripes. The delivered column is 506 wide by 1520 tall: there
+    is no room to divide it sideways.
+
+    So the structure is the banked billboard's, which is already proven at this
+    exact bucket: a heavy near mass capping the top, a heavy near mass holding
+    the bottom, and one luminous band between them carrying the whole subject.
+
+    And the subject in that band is the HEADLAND, not a city. This is the view
+    back across the water from inside the empire, so the empire is present as
+    the architecture you stand in rather than as a distant skyline. B and C
+    look from the headland toward the city; A looks from the city toward the
+    headland. Three screens, one continuous space, and the dense-city failure
+    is designed out rather than tuned at: nothing distant is ever itemised.
+
+    Four masses.
+    """
+    img = Image.new("RGB", (w, h), (0, 0, 0))
+    d = ImageDraw.Draw(img)
+
+    cap_y = int(h * 0.280)                 # underside of the portico above
+    terrace_y = int(h * 0.780)             # the terrace you stand on
+    strip_top, strip_bot = int(h * 0.580), int(h * 0.601)
+
+    # THE CAP. Near, and it holds the top of a very tall frame shut. Gradient
+    # runs nearer at the top: a single flat value over 28% of the frame paints
+    # as a featureless slab.
+    for y in range(cap_y):
+        f = y / max(1, cap_y)
+        v = int(248 - 22 * f)
+        d.line([(0, y), (w, y)], fill=(v, v, v))
+
+    # THE TERRACE. Nearest plane in frame, gradient running nearer toward the
+    # bottom edge for the same reason.
+    for y in range(terrace_y, h):
+        f = (y - terrace_y) / max(1, h - terrace_y)
+        v = int(238 + 16 * f)
+        d.line([(0, y), (w, y)], fill=(v, v, v))
+
+    # THE BAND between them stays black: sky above the horizon, water below.
+    # Any grey in the water region reads as a surface to stand things on,
+    # which is how a bay became a lawn in v4.
+
+    # The far headland: the one grey the water rule permits, because it is
+    # land. Same constant strip the 16:5 screens use, seen from the other side.
+    d.rectangle([0, strip_top, w, strip_bot], fill=(84, 84, 84))
+
+    # THE CRAG, centred, standing on that shore. Far and small here; the same
+    # rock is near and large on B and C. One landmark seen from a rotating
+    # viewpoint is Cole's own device and the only thing tying the three
+    # screens together.
+    cx, base = w // 2, int(h * 0.596)
+    d.polygon([(cx - int(w * 0.082), base), (cx - int(w * 0.050), int(h * 0.545)),
+               (cx, int(h * 0.508)), (cx + int(w * 0.046), int(h * 0.551)),
+               (cx + int(w * 0.078), base)], fill=(104, 104, 104))
+
+    return img.filter(ImageFilter.GaussianBlur(4))
+
+
+def build_wide_depth(w: int, h: int, stage: str = "savage",
+                     mirror: bool = False, band: int = WIDE_BAND_PX) -> Image.Image:
+    """Screens B and C, 16:5. The same headland vantage, before and after.
+
+    Everything meaningful is authored inside y 0..`band`; below that is
+    paint-out. The waterline, the horizon and the shelf sit at identical
+    fractions in both screens, so B and C read as one place at two moments.
+
+    `mirror` flips the crag to the right-hand side for screen C. The stumps are
+    NOT mirrored: they are authored left of centre precisely so that they clear
+    the crag in either position.
+    """
+    img = Image.new("RGB", (w, h), (0, 0, 0))
+    d = ImageDraw.Draw(img)
+
+    def by(f: float) -> int:            # fraction of the delivered band
+        return int(band * f)
+
+    strip_top, strip_bot = by(0.415), by(0.485)
+    shelf_y = by(0.892)
+
+    # FAR SHORE: a constant low strip, full width, identical in both screens.
+    d.rectangle([0, strip_top, w, strip_bot], fill=(84, 84, 84))
+
+    # Stage V's broken stumps stand on that strip. Value close to the strip's
+    # own, which is v9's lesson: flatter contrast reads as haze and gives the
+    # chain less to keep consistent.
+    if stage == "desolation":
+        for x0, wd, ht in DESOLATION_STUMPS:
+            d.rectangle([int(w * x0), strip_top - by(ht),
+                         int(w * (x0 + wd)), strip_top + 2], fill=(STUMP_VALUE,) * 3)
+
+    # THE BAY stays black between the strip and the shelf. Unconstrained.
+
+    # NEAR SHELF: the ground the viewer stands on. Only its top ~50 px are
+    # delivered, as a dark repoussoir band along the bottom edge; the rest runs
+    # off the cut and exists so the model paints something coherent above it.
+    for y in range(shelf_y, h):
+        f = (y - shelf_y) / max(1, h - shelf_y)
+        v = int(196 + 54 * min(1.0, f * 3.0))
+        d.line([(0, y), (w, y)], fill=(v, v, v))
+    # Irregular top edge, so the near waterline is not a ruler-straight line.
+    d.polygon([(0, shelf_y + 4), (int(w * 0.19), shelf_y - by(0.022)),
+               (int(w * 0.41), shelf_y + by(0.012)),
+               (int(w * 0.63), shelf_y - by(0.016)),
+               (int(w * 0.84), shelf_y + by(0.018)),
+               (w, shelf_y - by(0.010)), (w, shelf_y + 24), (0, shelf_y + 24)],
+              fill=(200, 200, 200))
+
+    # THE CRAG: near, brightest, and it breaks the horizon. That is what makes
+    # it read as monumental rather than as a rock in the water, and it is the
+    # element the 1:3 screen shows far away through the portico.
+    crag = [(0.013, 1.080), (0.020, 0.620), (0.062, 0.340), (0.098, 0.228),
+            (0.140, 0.400), (0.196, 0.600), (0.215, 1.080)]
+    pts = [(int(w * (1 - fx)) if mirror else int(w * fx), by(fy)) for fx, fy in crag]
+    d.polygon(pts, fill=(246, 246, 246))
+
+    return img.filter(ImageFilter.GaussianBlur(4))
+
+
 def soften(img: Image.Image, radius: int) -> Image.Image:
     """Blur the map hard, and break the flat fills with a faint gradient.
 
@@ -339,8 +504,15 @@ def main() -> int:
                     help="emit a ControlNet depth map instead of a tonal sketch")
     ap.add_argument("--stage", choices=list(SKYLINES), default=None,
                     help="emit a per-stage harbour depth map")
-    ap.add_argument("--scene", choices=["bowtie", "harbor"], default="bowtie",
-                    help="bowtie = Times Square; harbor = the Narrows from a headland")
+    ap.add_argument("--scene", choices=["bowtie", "harbor", "portal", "wide"], default="bowtie",
+                    help="bowtie = Times Square; harbor = the Narrows from a headland; "
+                         "portal = LED screen A (1:3); wide = LED screens B/C (16:5)")
+    ap.add_argument("--wide-stage", choices=["savage", "desolation"], default="savage",
+                    help="--scene wide only: savage (screen B) or desolation (screen C)")
+    ap.add_argument("--mirror", action="store_true",
+                    help="--scene wide only: put the crag right instead of left (screen C)")
+    ap.add_argument("--band", type=int, default=WIDE_BAND_PX,
+                    help="--scene wide only: last render row that survives the 16:5 crop")
     ap.add_argument("--soften", type=int, default=0,
                     help="extra blur radius; use ~14 to stop ControlNet tracing edges")
     ap.add_argument("--width", type=int, default=1344)
@@ -354,17 +526,26 @@ def main() -> int:
         out.save(args.out)
         print(f"{args.width}x{args.height} {args.stage} depth map -> {args.out}")
         return 0
-    if args.scene == "harbor":
-        if not args.depth:
-            raise SystemExit("--scene harbor is depth-only; pass --depth")
-        maker = build_harbor_depth
+    if args.scene == "portal":
+        out = build_portal_depth(args.width, args.height)
+    elif args.scene == "wide":
+        out = build_wide_depth(args.width, args.height, args.wide_stage,
+                               mirror=args.mirror, band=args.band)
     else:
-        maker = build_depth if args.depth else build
-    out = maker(args.width, args.height)
+        if args.scene == "harbor":
+            if not args.depth:
+                raise SystemExit("--scene harbor is depth-only; pass --depth")
+            maker = build_harbor_depth
+        else:
+            maker = build_depth if args.depth else build
+        out = maker(args.width, args.height)
     if args.soften:
         out = soften(out, args.soften)
     out.save(args.out)
-    kind = "depth map" if args.depth else "massing sketch"
+    if args.scene in ("portal", "wide"):
+        kind = f"{args.scene} depth map"
+    else:
+        kind = "depth map" if args.depth else "massing sketch"
     soft = f", softened r={args.soften}" if args.soften else ""
     print(f"{args.width}x{args.height} {kind}{soft} -> {args.out}")
     return 0

@@ -1,0 +1,137 @@
+# LED wall, screen A. 912 x 2736, 1:3 PORTRAIT, 10.000 s, 30 fps.
+#
+# Stage III of the cycle, seen from inside the empire looking BACK across the
+# water at the headland. B and C look from that headland toward the city; this
+# looks from the city toward the headland. Three screens, one continuous space.
+#
+# That framing is what removes the dense-city problem rather than tuning at it.
+# Ten renders established that a chained walk cannot hold a distant modern
+# skyline under any setting (findings/chained-diffusion-limits.md), and that
+# fewer, larger masses beat better weights. Here the empire is the architecture
+# you stand in, so nothing distant is ever itemised: four masses total.
+#
+# Render 896x1536 -> edge_crop 8 -> conform crops 506x1520 at x=195 -> lanczos
+# 1.802x to 912x2736. Only the CENTRAL 506 px column is delivered.
+#
+# A 1:3 frame composes in horizontal bands. Two earlier depth maps divided it
+# vertically instead and read as stripes; see build_portal_depth in
+# tools/make_massing.py for the full account. Structure here is the banked
+# billboard's, which is already proven at this bucket: heavy near mass capping
+# the top, heavy near mass holding the bottom, one luminous band between them.
+#
+# Drift is light only: silver midday to low gold and back, seamless.
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome"
+
+subject:
+  name: led_a_terrace
+  # Light term FIRST in every prompt. The style prefix plus a long body overran
+  # CLIP's 77-token limit on the first billboard attempt, silently truncating
+  # the tail, and the tail was the light descriptor that drives the whole drift.
+  # Measured on both SDXL tokenizers: prefix 12, these bodies land at 49/50/49.
+  prompts:
+    - label: "A: silver midday"
+      prompt: >-
+        bright silver midday light, seen from a shadowed marble terrace, a wide
+        calm bay below, a tall rocky crag on the far shore, deep shadow above
+        and below, luminous water
+    - label: "B: low gold"
+      prompt: >-
+        low golden afternoon light, seen from a shadowed marble terrace, a wide
+        calm bay below, a tall rocky crag on the far shore, deep shadow above
+        and below, burning gold water
+    - label: "A (return)"
+      prompt: >-
+        bright silver midday light, seen from a shadowed marble terrace, a wide
+        calm bay below, a tall rocky crag on the far shore, deep shadow above
+        and below, luminous water
+
+resolution:
+  width: 896
+  height: 1536
+
+# 3 prompts -> 2 segments. K = (4+2) + (4+4) + 1 = 15 keyframes.
+# Raw frames = K * (2^passes - 1 - 2*skip_boundary) - 1 = 15 * 23 - 1 = 344,
+# which conform.py retimes to exactly 300. The floor is 300, so K must be >= 14
+# at passes 5; K=13 gives 298 and conform refuses.
+#
+# K=15 over 10 s is 2.1x the banked files' drift rate, and it is deliberate:
+# passes 5 is what the empire run measured as the better interpolator (mid-pair
+# sharpness 68% -> 77%), and holding it forces K up. `steady_strengths` drops
+# from the profile's 0.55 to compensate, per the coupled-dial rule.
+frames:
+  steady: 4
+  transition: 2
+  return_: 4
+  warmup: 3
+
+render:
+  structural_decay_radius: 1
+  # Diffusers runs int(num_inference_steps * strength) actual steps, and
+  # crossing an integer boundary costs 20% of the computation invisibly: that
+  # is what blurred v5. v8 and v9 got 8 real steps from int(20 * 0.44). Holding
+  # 8 at the lower strength K=15 forces needs 8/0.36 = 22.2 steps, so 24.
+  # At 24 the 8-step band is [0.3333, 0.375) and 0.36/0.37 sit inside it with
+  # margin on both sides; at 20 steps these same values would silently drop to
+  # 7, three percent above the 0.35 boundary.
+  steady_strengths: [0.36, 0.36, 0.37, 0.36, 0.36, 0.37, 0.36, 0.37]
+  transition_strength: 0.38
+  # Light-only drift at return_/K = 0.27. Ramping DOWN into the anchor rather
+  # than up: the return is converging, so it should be changing less, not more.
+  # This stanza is the one part of the config with no measured backing.
+  return_strength_start: 0.36
+  return_strength_end: 0.30
+  return_pixel_blend_max: 0.35
+
+sampling:
+  num_inference_steps: 24
+  guidance_scale: 1.5
+
+control:
+  model: diffusers/controlnet-depth-sdxl-1.0
+  # ONE fixed map for the whole clip. A single stage per screen means the
+  # geometry never has to change, which is the most loop-stable configuration
+  # this pipeline has: composition is pinned while light drifts over it.
+  image: outputs/_anchors/led-a-portal.png
+  scale: 0.65
+  guidance_start: 0.0
+  guidance_end: 0.6
+
+rife:
+  passes: 5
+  skip_boundary: 4
+  edge_crop: 8
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/nyc-billboard/led
