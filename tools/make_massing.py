@@ -470,7 +470,7 @@ def build_fall_depth(w: int, h: int, phase: float = 0.0) -> Image.Image:
     img = Image.new("RGB", (w, h), (0, 0, 0))
     d = ImageDraw.Draw(img)
 
-    chan_l, chan_r = int(w * 0.34), int(w * 0.66)
+    chan_l, chan_r = int(w * 0.30), int(w * 0.70)
     margin = 40
 
     # CLIFFS as stepped ledges. Three discrete depth planes per side, each with
@@ -512,10 +512,10 @@ def build_fall_depth(w: int, h: int, phase: float = 0.0) -> Image.Image:
     # THE CHANNEL: repainted black, then given falling-water texture.
     d.rectangle([chan_l, 0, chan_r, h], fill=(0, 0, 0))
     srng = np.random.default_rng(7)
-    n_streaks = 26
+    n_streaks = 44
     for _ in range(n_streaks):
         sx = srng.uniform(chan_l + 8, chan_r - 8)
-        sw_ = srng.uniform(9, 24)
+        sw_ = srng.uniform(12, 30)
         sh_ = srng.uniform(70, 200)
         sy0 = srng.uniform(0, h)
         sv = int(srng.uniform(108, 148))
@@ -536,11 +536,33 @@ def build_fall_depth(w: int, h: int, phase: float = 0.0) -> Image.Image:
                (w, by + 2), (w, h)],
               fill=(224, 224, 224))
 
-    # SPRAY BASE: the channel's black otherwise runs under the basin to the
-    # bottom border, which puts the motion mask at full weight against the
-    # frame edge, i.e. the corner artefact by yet another road. The fall ends
-    # in static spray: mid value, above the mask threshold, not phased.
-    d.rectangle([chan_l, h - 64, chan_r, h], fill=(90, 90, 90))
+    # THE SPLASH: a broad bright mass where the fall strikes, wider than the
+    # channel, with a mist bloom above it. Bright = near = asserted strongly,
+    # which is what makes the model paint a real churning impact rather than a
+    # quiet pool edge.
+    sx0, sx1 = int(w * 0.22), int(w * 0.78)
+    sy = int(h * 0.895)
+    d.polygon([(sx0, h), (sx0 + 20, sy + 30), (int(w * 0.34), sy - 26),
+               (int(w * 0.46), sy + 18), (int(w * 0.55), sy - 34),
+               (int(w * 0.66), sy + 10), (sx1 - 16, sy + 26), (sx1, h)],
+              fill=(238, 238, 238))
+    d.ellipse([int(w * 0.30), sy - int(h * 0.045), int(w * 0.70), sy + int(h * 0.02)],
+              fill=(150, 150, 150))
+
+    # SPRAY BASE, drawn as overlapping irregular billows rather than a
+    # rectangle. The rectangular version was painted by the Cole LoRA as a
+    # GILDED PICTURE FRAME standing in the pool: a straight-edged mass at the
+    # bottom of a canvas is what a frame member looks like, and structural
+    # assertion beats the negative prompt every time it has been tested. No
+    # straight line may exist in the bottom region of this map.
+    brng = np.random.default_rng(23)
+    for _ in range(16):
+        bx = brng.uniform(chan_l - 30, chan_r + 30)
+        bw_ = brng.uniform(36, 90)
+        bh_ = brng.uniform(22, 46)
+        by_ = brng.uniform(h - 74, h - 6)
+        bv = int(brng.uniform(82, 102))
+        d.ellipse([bx - bw_, by_ - bh_, bx + bw_, by_ + bh_], fill=(bv, bv, bv))
 
     return img.filter(ImageFilter.GaussianBlur(4))
 
