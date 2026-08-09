@@ -445,55 +445,102 @@ def build_portal_depth(w: int, h: int) -> Image.Image:
     return img.filter(ImageFilter.GaussianBlur(4))
 
 
-def build_fall_depth(w: int, h: int) -> Image.Image:
+def build_fall_depth(w: int, h: int, phase: float = 0.0) -> Image.Image:
     """Screen A, 1:3 portrait. A gorge with a fall down the middle.
 
-    Built for `motion`: the MASK comes from this map's dark region, so the
-    black channel down the centre is doing two jobs at once. It tells
-    ControlNet "unconstrained, paint what the prompt says here", and it tells
-    the motion pass "this is what moves". The bright cliffs either side are
-    therefore both the pinned structure and the static region, with no separate
-    mask asset needed.
+    v2, after the smeared-corners regression. v1 drew the cliffs as SMOOTH
+    horizontal brightness ramps from the frame edge to the channel. A smooth
+    depth ramp is exactly what the v4 water lesson warned about: it reads as a
+    featureless surface receding, so ControlNet asserted a near structureless
+    wall at every edge and the model painted it as smeared horizontal bands.
+    Confirmed in the raw KEYFRAMES, so it was Phase A, not RIFE. Cliffs are now
+    SHAPED: discrete stepped ledges with irregular silhouettes, which is how
+    the harbour maps that never smeared are built, and the outer 40 px of the
+    frame falls to value ~72 so nothing near is asserted at the border.
 
-    Cliff values RAMP from bright at the outer frame edge to mid at the channel
-    lip, rather than sitting flat and bright. Two reasons. A gorge wall really
-    does recede from the viewer, so a flat value reads as a slab. And a flat
-    bright cliff would put more than half the frame above value 200, which is
-    the exact fault that made the first delivery maps paint an enormous near
-    mass with the horizon shoved out of frame. Target is ~21% near, matching
-    the maps that worked.
-
-    The delivered 1:3 column is the central 506 px of 896, so the channel is
-    sized to fill roughly the middle two thirds of what actually ships.
+    `phase` in [0, 1) slides falling-water TEXTURE down the channel: dim
+    elongated streaks (values 34 to 54, below the motion-mask threshold of 60,
+    so the channel remains the moving region). Attempts 1 to 3 established that
+    the model re-derives texture from the conditioning rather than carrying
+    displaced pixels, so the conditioning itself must move: render one map per
+    KEYFRAME with phase = i/K and the water's determining structure descends.
+    Streak y-positions wrap mod the channel height, so phase 1.0 equals phase
+    0.0 exactly and the loop closes by construction.
     """
     img = Image.new("RGB", (w, h), (0, 0, 0))
     d = ImageDraw.Draw(img)
 
     chan_l, chan_r = int(w * 0.34), int(w * 0.66)
+    margin = 40
 
-    # Cliffs, ramping away from the viewer toward the channel.
-    for x in range(chan_l):
-        f = x / max(1, chan_l)
-        v = int(246 - 126 * f)
-        d.line([(x, 0), (x, h)], fill=(v, v, v))
-    for x in range(chan_r, w):
-        f = (x - chan_r) / max(1, w - chan_r)
-        v = int(120 + 118 * f)
-        d.line([(x, 0), (x, h)], fill=(v, v, v))
+    # CLIFFS as stepped ledges. Three discrete depth planes per side, each with
+    # an irregular inner silhouette, brightest ledge INSET from the frame edge.
+    rng = np.random.default_rng(11)
+    for side in ("L", "R"):
+        planes = [(235, -0.10, 0.62), (192, 0.30, 0.86), (150, 0.58, 1.0)]
+        for v, f0, f1 in planes:
+            if side == "L":
+                x0, x1 = f0 * chan_l, f1 * chan_l
+            else:
+                inner = w - chan_r
+                x0 = chan_r + (1 - f1) * inner
+                x1 = chan_r + (1 - f0) * inner
+            # irregular vertical silhouette: a jittered polygon per ledge
+            steps = 14
+            ys = np.linspace(0, h, steps)
+            jit = rng.uniform(-0.34, 0.34, steps) * (x1 - x0)
+            edge = np.clip(x1 + jit, x0 + 4, chan_l if side == "L" else w)
+            if side == "L":
+                pts = [(x0, 0)] + [(float(e), float(y)) for e, y in zip(edge, ys)] + [(x0, h)]
+            else:
+                pts = [(x1, 0)] + [(float(2 * x0 - e + (x1 - x0)), float(y))
+                                   for e, y in zip(edge, ys)] + [(x1, h)]
+            d.polygon(pts, fill=(v, v, v))
 
-    # THE CHANNEL stays black top to bottom: the fall itself, unconstrained.
+    # Outer margin on all four sides: far, but not black, so it stays OUT of
+    # the motion mask (threshold 60) while asserting nothing near the border.
+    # NO margin treatment of any kind, and this is v4 of learning the same
+    # lesson. A smooth ramp smeared (v1). A flat grey ring smeared (v2, v3
+    # grey variant). A black ring smeared too (v3): a band of "infinitely far"
+    # cutting THROUGH solid rock is semantic nonsense, and the model paints
+    # nonsense as mud. The only borders that have ever rendered clean in this
+    # project carry SHAPED content that simply continues to the frame edge,
+    # which is what the bay maps' shelf does at the bottom border. So the
+    # ledges above run to x=0 and x=w, and the border gets whatever the rock
+    # is doing when it arrives there.
+
+    # THE CHANNEL: repainted black, then given falling-water texture.
     d.rectangle([chan_l, 0, chan_r, h], fill=(0, 0, 0))
+    srng = np.random.default_rng(7)
+    n_streaks = 26
+    for _ in range(n_streaks):
+        sx = srng.uniform(chan_l + 8, chan_r - 8)
+        sw_ = srng.uniform(9, 24)
+        sh_ = srng.uniform(70, 200)
+        sy0 = srng.uniform(0, h)
+        sv = int(srng.uniform(108, 148))
+        sy = (sy0 + phase * h) % h
+        for yy0, yy1 in (((sy, sy + sh_),) if sy + sh_ <= h
+                         else ((sy, h), (0, sy + sh_ - h))):
+            d.ellipse([sx - sw_, yy0, sx + sw_, yy1], fill=(sv, sv, sv))
 
-    # The lip: a rock ledge the water comes over, mid value so it reads as a
-    # far edge rather than as something standing in front of the fall.
+    # The lip: a fixed rock ledge the water comes over. Not phased.
     d.rectangle([chan_l, 0, chan_r, int(h * 0.055)], fill=(96, 96, 96))
 
-    # Plunge basin at the foot, near and bright, catching the fall. Kept low so
-    # it does not eat the near-value budget.
-    for y in range(int(h * 0.93), h):
-        f = (y - h * 0.93) / max(1.0, h - h * 0.93)
-        v = int(196 + 56 * f)
-        d.line([(0, y), (w, y)], fill=(v, v, v))
+    # Plunge basin: bright shelf with an irregular top edge, inset from the
+    # bottom border by the margin falloff above.
+    by = int(h * 0.93)
+    d.polygon([(0, h), (0, by + 10),
+               (int(w * 0.22), by - 14), (int(w * 0.44), by + 12),
+               (int(w * 0.60), by - 10), (int(w * 0.80), by + 8),
+               (w, by + 2), (w, h)],
+              fill=(224, 224, 224))
+
+    # SPRAY BASE: the channel's black otherwise runs under the basin to the
+    # bottom border, which puts the motion mask at full weight against the
+    # frame edge, i.e. the corner artefact by yet another road. The fall ends
+    # in static spray: mid value, above the mask threshold, not phased.
+    d.rectangle([chan_l, h - 64, chan_r, h], fill=(90, 90, 90))
 
     return img.filter(ImageFilter.GaussianBlur(4))
 
@@ -594,6 +641,9 @@ def main() -> int:
                     help="--stage only: omit the colossal statue")
     ap.add_argument("--crag-cx", type=float, default=None,
                     help="--stage only: move the crag's centre, as a fraction of width")
+    ap.add_argument("--fall-phases", type=int, default=0,
+                    help="--scene fall only: write N maps at phase i/N for "
+                         "per-keyframe control animation; --out is the stem")
     ap.add_argument("--soften", type=int, default=0,
                     help="extra blur radius; use ~14 to stop ControlNet tracing edges")
     ap.add_argument("--width", type=int, default=1344)
@@ -608,6 +658,17 @@ def main() -> int:
             out = soften(out, args.soften)
         out.save(args.out)
         print(f"{args.width}x{args.height} {args.stage} depth map -> {args.out}")
+        return 0
+    if args.scene == "fall" and args.fall_phases:
+        stem = args.out.with_suffix("")
+        for i in range(args.fall_phases):
+            m = build_fall_depth(args.width, args.height, phase=i / args.fall_phases)
+            if args.soften:
+                m = soften(m, args.soften)
+            p = stem.parent / f"{stem.name}-p{i:02d}.png"
+            m.save(p)
+        print(f"{args.fall_phases} fall maps at {args.width}x{args.height} -> "
+              f"{stem.name}-p00..p{args.fall_phases - 1:02d}.png")
         return 0
     if args.scene == "fall":
         out = build_fall_depth(args.width, args.height)

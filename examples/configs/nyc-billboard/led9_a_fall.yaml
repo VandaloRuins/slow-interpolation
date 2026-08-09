@@ -1,0 +1,140 @@
+# LED wall, screen A. 912 x 2736, 1:3 PORTRAIT, 10.000 s, 30 fps.
+#
+# ATTEMPT 5: conditioning-only motion, and the corner fix that finally
+# matches the evidence.
+#
+# led7 proved the composition (stepped-ledge cliffs paint as real rock, the
+# fall reads) and disproved two more mechanisms. Its phase streaks at value
+# 34 to 54 were invisible to ControlNet: 3/10 keyframes matched their own
+# phase at r ~ 0.1, i.e. chance. And its mid-grey margin ring painted as
+# smeared banding, the same fault as v1's ramps: any flat or ramped grey is a
+# featureless surface. The only corner treatment that has ever rendered clean
+# is the bay maps', assert NOTHING. So margins are now black, streaks are 108
+# to 148, and the PIXEL ADVECTION IS GONE: four measurements agree the model
+# discards displaced input, so the conditioning alone carries the motion.
+#
+# K=20 rather than 10, halving the per-keyframe step to ~77 px so RIFE tracks
+# clump displacement without ghosting. 20 maps at phase i/20; map 20 = map 0,
+# so the loop closes in the conditioning by construction.
+#
+seed: 1087
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome, people, figures, buildings"
+
+subject:
+  name: led9_a_fall
+  # Light barely moves here on purpose. This render is testing MOTION, and a
+  # large light arc would confound the read. 40 and 43 tokens.
+  prompts:
+    - label: "A: grey daylight"
+      prompt: >-
+        soft grey daylight, a tall waterfall falling down a dark rocky gorge,
+        wet cliff walls either side, white spray at the foot, no people
+    - label: "B: sun into the gorge"
+      prompt: >-
+        pale sunlight breaking into the gorge, a tall waterfall falling down a
+        dark rocky gorge, wet cliff walls either side, white spray at the foot,
+        no people
+    - label: "A (return)"
+      prompt: >-
+        soft grey daylight, a tall waterfall falling down a dark rocky gorge,
+        wet cliff walls either side, white spray at the foot, no people
+
+resolution:
+  width: 896
+  height: 1536
+
+# K = (3+1) + (3+2) + 1 = 10 keyframes.
+# raw = K * (2^5 - 1 - 0) - 1 = 10 * 31 - 1 = 309, retimed to 300 (1.03x).
+frames:
+  steady: 8
+  transition: 1
+  return_: 2
+  warmup: 3
+
+# 154 px per keyframe over 10 keyframes = 1540 px against a 1536 px frame, so
+# the water traverses the full height exactly once across the loop. Per invented
+# frame that is 154/31 = 5.0 px, comfortably inside what optical flow tracks.
+
+render:
+  structural_decay_radius: 1
+  steady_strengths: [0.40, 0.40, 0.42, 0.40, 0.40, 0.42, 0.40, 0.42]
+  transition_strength: 0.42
+  # Return behaves like a steady segment: no pixel pull toward the anchor,
+  # which would drag the water back up and fight the fall.
+  return_strength_start: 0.40
+  return_strength_end: 0.40
+  return_pixel_blend_max: 0.0
+
+sampling:
+  num_inference_steps: 20
+  guidance_scale: 1.5
+
+control:
+  model: diffusers/controlnet-depth-sdxl-1.0
+  # Ten maps, one per keyframe, cycled by keyframe index. Streak texture in the
+  # channel is authored at phase i/10 and wraps mod the channel height, so map
+  # 10 equals map 0 and the loop closes in the CONDITIONING, not just pixels.
+  keyframe_images:
+    - outputs/_anchors/led9-a-fall-p00.png
+    - outputs/_anchors/led9-a-fall-p01.png
+    - outputs/_anchors/led9-a-fall-p02.png
+    - outputs/_anchors/led9-a-fall-p03.png
+    - outputs/_anchors/led9-a-fall-p04.png
+    - outputs/_anchors/led9-a-fall-p05.png
+    - outputs/_anchors/led9-a-fall-p06.png
+    - outputs/_anchors/led9-a-fall-p07.png
+    - outputs/_anchors/led9-a-fall-p08.png
+    - outputs/_anchors/led9-a-fall-p09.png
+    - outputs/_anchors/led9-a-fall-p10.png
+    - outputs/_anchors/led9-a-fall-p11.png
+    - outputs/_anchors/led9-a-fall-p12.png
+    - outputs/_anchors/led9-a-fall-p13.png
+    - outputs/_anchors/led9-a-fall-p14.png
+    - outputs/_anchors/led9-a-fall-p15.png
+    - outputs/_anchors/led9-a-fall-p16.png
+    - outputs/_anchors/led9-a-fall-p17.png
+    - outputs/_anchors/led9-a-fall-p18.png
+    - outputs/_anchors/led9-a-fall-p19.png
+  scale: 0.65
+  guidance_start: 0.0
+  guidance_end: 0.6
+
+rife:
+  passes: 5
+  skip_boundary: 0
+  edge_crop: 8
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/nyc-billboard/led

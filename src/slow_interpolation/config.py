@@ -99,6 +99,15 @@ class ControlConfig:
     # (the crag, Liberty's island) stay at identical coordinates in every map
     # and therefore persist across the whole cycle.
     images: list[Path] | None = None
+    # One map per KEYFRAME, cycled by keyframe index: map[i % len]. This is the
+    # channel through which structure can MOVE. Attempts 1 to 3 at directional
+    # water established that the model re-derives texture from the conditioning
+    # rather than carrying displaced pixels (band survival between keyframes:
+    # finer than ~8 px r=0.05, advected band shift +1 px against an intended
+    # +154), so animating the pixels cannot work while the map stands still.
+    # Author the maps so index 0 and index len both equal phase zero and the
+    # loop closes by construction. Mutually exclusive with `images`.
+    keyframe_images: list[Path] | None = None
     scale: float = 0.55
     guidance_start: float = 0.0
     guidance_end: float = 0.5
@@ -498,6 +507,8 @@ def load_pipeline_config(path: str | Path) -> PipelineConfig:
         _coerce_paths(cd, ["image"])
         if cd.get("images"):
             cd["images"] = [Path(p).expanduser() for p in cd["images"]]
+        if cd.get("keyframe_images"):
+            cd["keyframe_images"] = [Path(p).expanduser() for p in cd["keyframe_images"]]
         control = ControlConfig(**cd)
     motion = MotionConfig(**raw["motion"]) if raw.get("motion") else None
     rife = _build_rife(raw.get("rife"))

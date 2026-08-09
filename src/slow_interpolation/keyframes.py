@@ -258,6 +258,7 @@ def generate_keyframes(
 
     n_segments = len(subject.prompts) - 1
 
+    kf_counter = [0]   # running index of the NEXT keyframe to be generated
     current_img = _random_noise_image(res.width, res.height, config.seed)
     # One generator threaded through every call, so the SEQUENCE of samples is
     # what is reproducible, not each call in isolation. Left None the sampler
@@ -283,6 +284,22 @@ def generate_keyframes(
         if ctrl_maps:
             print(f"[keyframes] {len(ctrl_maps)} control map(s), "
                   f"{'cross-faded per stage' if len(ctrl_maps) > 1 else 'fixed'}")
+
+    # Per-KEYFRAME control maps: the channel through which structure MOVES.
+    # `images` cross-fades per prompt, which is a dissolve; a dissolve cannot
+    # translate anything. These are indexed by the running keyframe counter
+    # instead, so a texture authored at phase i/K in map i genuinely descends
+    # from one keyframe to the next, and the repaint follows it because the
+    # conditioning is what the model re-derives texture FROM (attempts 1 to 3).
+    kf_ctrl_maps: list[Image.Image] = []
+    if ctrl is not None and ctrl.keyframe_images:
+        kf_ctrl_maps = [
+            Image.open(s).convert("RGB").resize((res.width, res.height), Image.LANCZOS)
+            for s in ctrl.keyframe_images
+        ]
+        print(f"[keyframes] {len(kf_ctrl_maps)} PER-KEYFRAME control maps, cycled")
+        if not ctrl_maps:
+            ctrl_maps = [kf_ctrl_maps[0]]   # motion mask + warmup use phase 0
 
     # Masked directional motion. Built once: the mask is derived from the first
     # control map's dark region, which is where water already lives by the
@@ -318,8 +335,11 @@ def generate_keyframes(
 
         With one map, always that map. With a list, cross-fade between map[seg]
         and map[seg+1] on the same `t` the prompt embeddings use, so structure
-        and text change together instead of fighting.
+        and text change together instead of fighting. Per-keyframe maps trump
+        both and cycle on the keyframe counter.
         """
+        if kf_ctrl_maps:
+            return kf_ctrl_maps[kf_counter[0] % len(kf_ctrl_maps)]
         if not ctrl_maps:
             return None
         if len(ctrl_maps) == 1:
@@ -426,6 +446,7 @@ def generate_keyframes(
                                      style.scale_at(seg_idx) if style.lora_scale_per_segment else None)
             current_img.save(output_dir / f"{frame_idx:04d}.png")
             frame_idx += 1
+            kf_counter[0] += 1
 
         # Transition or return.
         actual_n = frames.return_ if is_return else frames.transition_at(seg_idx)
@@ -460,6 +481,7 @@ def generate_keyframes(
                                      style.scale_at(seg_idx) if style.lora_scale_per_segment else None)
             current_img.save(output_dir / f"{frame_idx:04d}.png")
             frame_idx += 1
+            kf_counter[0] += 1
 
     # Append anchor as final keyframe for clean loop closure.
     anchor_img.save(output_dir / f"{frame_idx:04d}.png")

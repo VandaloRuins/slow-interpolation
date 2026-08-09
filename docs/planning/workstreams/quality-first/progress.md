@@ -585,6 +585,54 @@ fourth attempt. Untested routes, in the order they look most promising:
 
 Spend on this thread so far: about $0.22 across five renders.
 
+### Attempts 4 and 5: animate the conditioning. Also failed, completing the picture
+
+Per-keyframe control maps now exist (`control.keyframe_images`, cycled by keyframe
+index; `images` cross-fades per prompt, and a cross-fade is a dissolve, not a
+translation). Streak texture authored at phase i/K descends through the maps and wraps,
+so the loop closes in the conditioning by construction.
+
+- **Attempt 4** (led7): streaks at value 34 to 54. Invisible to ControlNet: 3/10
+  keyframes best-matched their own phase map, r ~ 0.1, chance level.
+- **Attempt 5** (led8): streaks at 108 to 148, K=20 so RIFE tracks a ~77 px step,
+  pixel advection removed entirely. Phase-following 2/20, own-phase r = +0.05.
+
+**Conclusion across all five mechanisms**: the img2img feedback loop inherits its own
+previous texture more strongly than any external signal injectable at settings
+compatible with this aesthetic. Displaced pixels are discarded (attempts 1 to 3), and
+conditioning phase is out-shouted by the input image (4 and 5). Directional in-frame
+water motion is beyond this pipeline's current mechanism set.
+
+**The one untried route is fundamentally different**: composite the falling-water layer
+OUTSIDE diffusion. Paint the gorge with the pipeline (it is now very good at that), then
+render the fall as a procedural cyclic layer blended in at the channel, Phase B style.
+Guaranteed motion, guaranteed loop, and the open question moves to whether a composited
+layer can read as paint. `cloud/compositing_sketch.py` exists as a starting point.
+
+### The corner smear: root-caused through four map versions, and it does not ship
+
+The band is **in the raw keyframes**, Phase A, not RIFE. It appears wherever the map
+asks the border to be something featureless or semantically false, and it survived four
+border treatments: smooth ramps (v1), a flat grey ring (v2), a black ring cutting
+through rock (v3, nonsense geometry paints as mud), and shaped rock columns to the edge
+(v4, a tall UNIFORM column paints as repetitive fill that collapses into smear).
+Comparison across portrait renders shows the variable is edge CONTENT: led3's sky and
+shore edges are clean, terrace's varied rock is mildly affected, the fall's uniform
+1500 px columns are heavily affected.
+
+**Practically: screen A's conform crop keeps only the central 506 px, and the smear
+lives in the outer ~80. The delivered file's corners are clean**, verified on
+`candidate4/`. The raw renders in the gallery DO show it, so judge A candidates from
+the conformed file, not the raw card. For B/C the full width ships, but their maps put
+sky and shore at the edges, which is the clean case.
+
+### led9 is the best waterfall composition of the run
+
+Stepped-ledge cliffs paint as real Cole rock, multi-tier fall, foliage, basin.
+Conformed and spec-verified at `candidate4/VANDALO RUINS_SLOW INTERPOLATION_
+NY1087A_090226.mp4`. The water churns painterly rather than descending; whether that
+is acceptable for the billboard, or the compositing route gets built, is Luca's call.
+
 ### Worth keeping regardless of how this resolves
 
 - **`skip_boundary` must be 0 for translation work.** It drops the invented frames
