@@ -121,6 +121,17 @@ def main() -> int:
     # So: skip anything over the per-asset cap, skip stills unless asked, and
     # then rewrite the page so nothing points at a file that was not copied.
     assets = sorted({m for c in kept for m in ASSET_RE.findall(c)})
+    # The PLAYBACK path is sacred: whatever a card's data-src or <img> points
+    # at must ship, whatever its size, or the card renders a poster that 404s
+    # on click, which is exactly what happened to an 18 MB conformed
+    # deliverable sitting under the proxy threshold but over the asset cap.
+    # The size cap exists to drop 60 MB download-only originals, so it applies
+    # ONLY to assets referenced exclusively by download links.
+    playable = {m for c in kept
+                for m in re.findall(r'(?:data-src|<img src)="(outputs/[^"]+)"',
+                                    c.replace('<img src="', '<img src="'))}
+    playable |= {m for c in kept for m in re.findall(r'data-src="(outputs/[^"]+)"', c)}
+    playable |= {m for c in kept for m in re.findall(r'<img src="(outputs/[^"]+)"', c)}
     total = 0
     copied = 0
     missing: list[str] = []
@@ -132,10 +143,12 @@ def main() -> int:
             missing.append(a)
             skipped.add(a)
             continue
-        if a.lower().endswith(".png") and not args.stills and "posters" not in a:
+        if a in playable:
+            pass                       # always ship the playback path
+        elif a.lower().endswith(".png") and not args.stills and "posters" not in a:
             skipped.add(a)
             continue
-        if src.stat().st_size > cap:
+        elif src.stat().st_size > cap:
             skipped.add(a)
             continue
         dst = out / a

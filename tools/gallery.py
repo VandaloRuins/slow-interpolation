@@ -40,7 +40,11 @@ PREVIEW_DIR = OUTPUTS / "_gallery" / "previews"
 # clip is 363 MB. That will not stream to a phone over a tunnel no matter how
 # correct the server is. Anything above this gets a web-friendly proxy for
 # playback; the original stays on disk untouched.
-PREVIEW_OVER_MB = 25
+# 12 rather than 25: an 18 MB conformed deliverable sat under the old
+# threshold, got no proxy, and its card pointed at the full file, which the
+# Vercel deploy then dropped for size, so the card 404ed on click. Every card
+# a phone or a capped deploy will meet must point at a proxy.
+PREVIEW_OVER_MB = 12
 PAGE = ROOT / "gallery.html"
 # Notes you type in the gallery. The page cannot write to disk from file://, so
 # it keeps them in localStorage and exports this file on demand; the builder
@@ -806,7 +810,11 @@ def build(refresh: bool) -> int:
     configs = load_configs()
     feedback = load_feedback()
     videos = sorted(
-        (p for p in OUTPUTS.rglob("*.mp4") if "_gallery" not in p.parts and "archive" not in p.parts),
+        # _deploy is the Vercel bundle: COPIES of renders. Indexing it made
+        # duplicate cards whose data-src pointed inside the bundle directory.
+        (p for p in OUTPUTS.rglob("*.mp4")
+         if "_gallery" not in p.parts and "archive" not in p.parts
+         and "_deploy" not in p.parts),
         key=lambda p: generated_at(p)[0], reverse=True,
     )
 
