@@ -486,6 +486,63 @@ Cost is Modal dollars unless marked. "Unblocks" names what the result decides.
 - [findings/denoise-step-budget.md](../../../findings/denoise-step-budget.md).
 - Modal smoke re-verified after a three-month gap.
 
+## PARKED: directional motion, attempt 1 failed. Read this before retrying.
+
+Shipped `motion.py` + `MotionConfig` (commit `0264d3118`). The mechanism is wired and
+the mask is exact, but **the first waterfall test is a regression and must not be built
+on as-is.**
+
+### What was measured, not guessed
+
+Cross-correlating the water column between consecutive frames:
+
+| render | frame-to-frame shift | frames still |
+|---|---|---|
+| `led4_a_fall` (dy=154) | **+0.09 px** mean, median 0.00 | **92%** |
+| `led4_a_fall_static` (dy=0) | 0.00 px | 100% |
+
+Intended speed was 5.0 px/frame. **The water never translated.** An earlier claim that
+motion was working came from a pixel-delta ratio (water changed 1.65x the rock against
+1.09x static); that measured CHURN and was the wrong instrument. Cross-correlate before
+claiming translation.
+
+### Why it failed, and it is a design error rather than a tuning one
+
+**The region was translated, not the texture.** The mask covers the whole channel
+including the top of the fall, so displacing it downward carries the fall's own top edge
+down and the waterfall SHORTENS FROM ABOVE instead of water descending through it. Luca
+identified this from the render before the measurement did. The vacated strip is then
+edge-filled and repainted, which is where the artefacts come from. Both reported
+symptoms follow from the one mistake.
+
+### The retry design
+
+1. **Frequency-separate the moving region.** Advect ONLY the high-frequency band. The
+   silhouette is low-frequency, so pinning it makes the fall's height structurally
+   incapable of changing. Phase A.5 is already a frequency-separated smoother and
+   `noise/frequency_banded.py` exists; this is existing practice, not a new idea.
+2. **Make the advection cyclic within the mask**, so texture leaving the bottom re-enters
+   at the top. Physically right for a steady fall, removes the vacated strip and its
+   artefacts entirely, and closes the loop by construction, which was the open risk.
+3. **Then sweep strength.** 92% of frames unchanged says the repaint erases what it is
+   given. Motion wants LOW strength (preserve a displaced input, ~0.15 to 0.25), which is
+   the opposite of every tuning decision made so far, because all of those were asking
+   the model to BUILD an image rather than preserve one.
+4. Consider displacing the noise walk's persistent tensor with the texture, or disabling
+   the walk inside the mask. It re-imposes a static spatial pattern every frame and is a
+   second anchoring mechanism working against the motion.
+
+### Worth keeping regardless of how this resolves
+
+- **`skip_boundary` must be 0 for translation work.** It drops the invented frames
+  nearest each keyframe, which is correct for content drift but inserts a positional jump
+  of about `2*skip/2^passes` of the step into a rigid translation. Motion and light-drift
+  configs therefore cannot share a preset.
+- **Static regions cost nothing.** Flow is zero over them, so RIFE copies them: no
+  mid-pair sharpness pulse on the rock. Softness lands only on the moving region, which
+  is the one place it is correct.
+- The gorge depth map and the 1:3 framing both read well. Only the motion is unresolved.
+
 ## Session 2026-08-09: delivery-aspect authoring, and two code faults it exposed
 
 Paused mid-session at Luca's request. **Read L16 before trusting L-anything about

@@ -75,7 +75,63 @@ STYLE_TAGS = {
 
 # --------------------------------------------------------------------- probing
 
-def ffprobe(path: Path) -> dict | None:
+PROBE_CACHE = OUTPUTS / "_gallery" / "probe-cache.json"
+_probe_cache: dict[str, dict] = {}
+_probe_stats = {"hit": 0, "miss": 0}
+
+
+def load_probe_cache() -> None:
+    """Load the probe cache. Missing or corrupt cache is not an error.
+
+    `ffprobe -count_frames` DECODES EVERY FRAME to count them, which is the
+    honest way to get a frame count and also the entire cost of a rebuild: at
+    312 renders it was about ten minutes, most of it re-decoding files that had
+    not changed since the last run. Videos here are immutable once written, so
+    the result is cacheable on (size, mtime_ns).
+    """
+    global _probe_cache
+    try:
+        _probe_cache = json.loads(PROBE_CACHE.read_text(encoding="utf-8"))
+    except Exception:
+        _probe_cache = {}
+
+
+def save_probe_cache() -> None:
+    PROBE_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        PROBE_CACHE.write_text(json.dumps(_probe_cache), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def ffprobe(path: Path, use_cache: bool = True) -> dict | None:
+    """Probe a video, reusing a cached result when the file is byte-identical.
+
+    Keyed on size AND mtime_ns together: either alone is too weak. A re-download
+    from the Modal volume rewrites mtime while the bytes are identical, which
+    would only cost a redundant probe, but a same-size overwrite with a
+    different mtime must invalidate, and a same-mtime file of different size
+    must too.
+    """
+    key = str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
+    try:
+        st = path.stat()
+        stamp = [st.st_size, st.st_mtime_ns]
+    except OSError:
+        return None
+    if use_cache:
+        hit = _probe_cache.get(key)
+        if hit and hit.get("stamp") == stamp:
+            _probe_stats["hit"] += 1
+            return hit["info"]
+    _probe_stats["miss"] += 1
+    info = _ffprobe_uncached(path)
+    if info is not None:
+        _probe_cache[key] = {"stamp": stamp, "info": info}
+    return info
+
+
+def _ffprobe_uncached(path: Path) -> dict | None:
     try:
         out = subprocess.run(
             ["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_frames",
@@ -701,11 +757,52 @@ apply();
 """
 
 
+def verify_page() -> list[str]:
+    """Check the page we just wrote actually works. Returns a list of problems.
+
+    Every gallery failure on 2026-08-08 and 2026-08-09 was SILENT: the command
+    exited zero, the file looked right, and the page was wrong. Grepping the
+    HTML for a render name says nothing, because the markup can be perfect while
+    the script block is dead.
+
+    The specific near-miss worth guarding: `JS` is a plain string, NOT an
+    f-string, so a Python brace placeholder written into it emits literally as
+    `{n_tags}` and kills the entire script. The page then contains every element
+    and does nothing at all.
+    """
+    problems: list[str] = []
+    try:
+        html_text = PAGE.read_text(encoding="utf-8")
+    except OSError as e:
+        return [f"cannot read the page just written: {e}"]
+
+    if len(html_text) < 2000:
+        problems.append(f"page is only {len(html_text)} bytes, which is too small to be real")
+
+    body = html_text.partition("<script>")[2].rpartition("</script>")[0]
+    leaks = sorted(set(re.findall(r"\{[a-z_][a-z0-9_]*\}", body)))
+    if leaks:
+        problems.append(
+            "unresolved Python placeholders inside the <script> block "
+            f"({', '.join(leaks[:5])}): JS is a plain string, not an f-string, "
+            "so these are a syntax error and the whole script is dead"
+        )
+
+    for tok in ('id="tagbar"', 'id="togglefilters"', 'id="count"', "const cards"):
+        if tok not in html_text:
+            problems.append(f"expected marker missing from the page: {tok}")
+
+    if html_text.count('class="card"') == 0:
+        problems.append("no cards in the page")
+    return problems
+
+
 def build(refresh: bool) -> int:
     if not OUTPUTS.exists():
         print(f"no outputs directory at {OUTPUTS}", file=sys.stderr)
         return 1
 
+    load_probe_cache()
     configs = load_configs()
     feedback = load_feedback()
     videos = sorted(
@@ -925,7 +1022,17 @@ def build(refresh: bool) -> int:
 <footer>Built {built} by tools/gallery.py. Rebuild after new renders.</footer>
 <script>{JS}</script></body></html>""", encoding="utf-8")
 
-    print(f"{len(cards)} renders indexed -> {rel(PAGE)}")
+    save_probe_cache()
+    print(f"{len(cards)} renders indexed -> {rel(PAGE)}  "
+          f"(probe cache: {_probe_stats['hit']} reused, {_probe_stats['miss']} decoded)")
+
+    problems = verify_page()
+    for p in problems:
+        print(f"  !! {p}", file=sys.stderr)
+    if problems:
+        print("  !! the page was written but FAILED self-check; do not tell anyone to "
+              "look until this is resolved", file=sys.stderr)
+        return 1
     return 0
 
 
