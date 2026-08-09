@@ -49,6 +49,14 @@ Also: pixel-delta metrics (motion, loop wrap) scale with sharpness, so comparing
 across renders of different sharpness is confounded. Report absolute values, not only
 ratios normalised by the median.
 
+## Route to the deep skills
+
+This skill is triage: symptom to mechanism. Once you know which mechanism, use:
+
+- **`interpolation-curves`** for the two rhythms, `skip_boundary`, keyframe density,
+  frame arithmetic and edge smear.
+- **`video-review`** for running the Gemini review and choosing which frames to extract.
+
 ## The instruments
 
 | Tool | Answers |
