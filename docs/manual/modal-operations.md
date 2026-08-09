@@ -132,10 +132,17 @@ Pre-flight signals you have no Modal auth:
 test -f ~/.modal.toml && echo "configured" || echo "not configured"
 
 # Or attempt a dry call; will fail with a recognisable auth error.
-modal token current 2>&1 | grep -E "AuthError|Not authenticated|No token" && echo "no auth"
+# NOTE: the command is `modal profile current`, NOT `modal token current`.
+# `modal token` has no `current` subcommand (see modal-sdk-quirks.md #12).
+modal profile current 2>&1 | grep -E "AuthError|Not authenticated|No token" && echo "no auth"
 ```
 
 If either signal returns "not configured" or "no auth", branch into account setup before any dispatch.
+
+**Do not treat a non-zero exit from a mistyped command as "not authenticated".** Verify with
+`modal profile current` (exit 0 plus a workspace name) before concluding anything about the
+account. A wrong command here reads a healthy account as broken and pushes the user into a
+pointless signup flow.
 
 ### The signup flow
 
@@ -160,7 +167,7 @@ Procedure (adapt to your runtime):
 2. **Surface the offer to the user, defaulting to the no-card path for workshop students**: "Modal Starter has two free-credit doors. (a) Sign up with GitHub or Google OAuth and skip the card, get a one-time $5 credit which covers about 108 60s loops on L40S, enough for today's session. (b) Add a card on file and get $30/month of compute credit (card not charged within the free tier), good for ongoing work at home. For the workshop, I recommend (a); you can upgrade to (b) later if you want to keep going."
 3. **Wait for the user to complete OAuth**: the page redirects them to GitHub/Google for auth, then back to Modal where they pick a workspace name. This is a manual step; you cannot complete it for them.
 4. **After they confirm signup**: in the repo's terminal, run `modal token new`. This opens a browser to a Modal auth-bridge page where they confirm the local CLI is theirs. The token writes to `~/.modal.toml`.
-5. **Verify**: `modal token current` returns the workspace name. `modal run -m cloud.preflight` succeeds and reports volume state (likely empty for a new account).
+5. **Verify**: `modal profile current` returns the workspace name. `modal run -m cloud.preflight` succeeds and reports volume state (likely empty for a new account).
 6. **Optional**: if the user wants academic credit (they're a graduate student or in a lab), point them at https://modal.com/pricing under "Credit grants for academics" (up to $10k for grad students, labs, researchers). Out of scope for the workshop's session but worth surfacing for serious users.
 
 ### Default-deny with consent escalation
@@ -177,7 +184,7 @@ For both, frame the choice to the user in your status message ("I can pause here
 ### Things you do NOT do, ever
 
 - **Do not promise specific costs without re-confirming.** Modal repriced GPU tiers as recently as the build date of this doc; surface the cost-vs-time recommendation from the routing table and let the user decide.
-- **Do not push to Modal before signup completes.** A failed dispatch creates user confusion. Verify `modal token current` succeeds before any dispatch.
+- **Do not push to Modal before signup completes.** A failed dispatch creates user confusion. Verify `modal profile current` succeeds before any dispatch.
 - **Do not silently retain credentials across sessions.** Even with consent for one session, the user re-authorises the next time. Never write OAuth credentials to any tracked file.
 
 ### When account setup is the wrong call

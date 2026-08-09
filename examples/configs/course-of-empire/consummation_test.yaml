@@ -1,0 +1,107 @@
+# Course of Empire on Times Square: CONSUMMATION, feasibility test.
+#
+# This is a risk probe, not a candidate render. It tests the single thing that
+# could kill the concept: the Thomas Cole LoRA was trained on ~80 Hudson River
+# School landscapes with zero modern architecture, zero signage and zero lit
+# night city. Savage State and Desolation sit close to that distribution.
+# Consummation does not. If the LoRA turns Broadway into a Roman colonnade, we
+# need to know now.
+#
+# Settings are rd's, the step-ladder winner: control sampling at 4 steps /
+# guidance 1.5, with `vae_kind: full`. See docs/findings/denoise-step-budget.md.
+#
+# THE ANCHOR. Cole's cycle is held together by a crag with a boulder on its
+# summit, visible in all five canvases from a rotating viewpoint. It is geology,
+# so it outlasts the empire. Our equivalent is the WEDGE at the fork of the two
+# avenues (Broadway cuts diagonally because it follows the Wickquasgeck trail,
+# which predates the grid, so the fork is the oldest thing on the site). One
+# silhouette persists across the cycle while its substance changes: bare rock,
+# then built and lit, then ruin. Every stage prompt must name the wedge at the
+# fork, and only the angle and the substance change.
+#
+# Drift is light only, dusk to full night. The arc across stages lives BETWEEN
+# the three screens, never inside one clip. See workstreams/quality-first L9 for
+# why a content arc cannot read as slow drift in ten seconds.
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.75
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  # REWRITTEN for this subject. The billboard configs forbade "modern buildings,
+  # signage, cars, text, people, figures", which is five of the things Times
+  # Square is made of. Only the border-artifact and canvas-artifact terms are
+  # kept, plus "artist signature" because the ladder showed auction-catalogue
+  # signatures leaking through on a LoRA trained from catalogue scans.
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry"
+
+subject:
+  name: coe_consummation_test
+  # Light term FIRST. Style prefix plus a long body overran CLIP's 77-token
+  # limit once already on this project and silently truncated the tail, which
+  # was the drift driver. Token count verified against both SDXL tokenizers
+  # before dispatch.
+  prompts:
+    - label: "A: consummation, dusk"
+      prompt: >-
+        deep blue dusk light, a vast electric city at its height, a wedge-shaped
+        tower at the fork of two broad avenues, tiers of glowing signs climbing
+        every facade, a great crowded square below, monumental
+    - label: "B: consummation, midnight blaze"
+      prompt: >-
+        blazing white midnight light, a vast electric city at its height, a
+        wedge-shaped tower at the fork of two broad avenues, tiers of burning
+        signs climbing every facade, a great crowded square below, monumental
+    - label: "A (return)"
+      prompt: >-
+        deep blue dusk light, a vast electric city at its height, a wedge-shaped
+        tower at the fork of two broad avenues, tiers of glowing signs climbing
+        every facade, a great crowded square below, monumental
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 2
+  transition: 1
+  return_: 1
+  warmup: 3
+
+sampling:
+  num_inference_steps: 4
+  guidance_scale: 1.5
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/course-of-empire

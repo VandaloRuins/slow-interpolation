@@ -1,0 +1,187 @@
+# THE COURSE OF EMPIRE v7: the sharpness PULSE flattened. ~2 min.
+#
+# Measured on v6: sharpness swings 28.9% of its mean with a per-pair periodic
+# component 73.4x an average FFT bin. The image breathes in and out of focus
+# ~1.3 times a second for the whole clip. Frame-average metrics cannot see this
+# at all, which is why raising average sharpness did not remove the perceived
+# blur.
+#
+# skip_boundary 4 -> 8 discards the frames nearest each keyframe, which are the
+# sharp PEAKS, so the trough sits closer to the crest. Same reason Gemini
+# scored skip_boundary 8 best on motion in the first movement sweep.
+#
+# Measured on v5: 86% of frames softer than v2's median, source keyframes 62.5
+# mean against v2's 118.9, and mid-pair sharpness actually IMPROVED to 79% from
+# 68%. So the blur was never the interpolation, it was Phase A, from two causes
+# that compound:
+#   int(12 * 0.39) = 4 real denoising steps, where int(12 * 0.44) = 5. A
+#     rounding boundary cost every keyframe 20% of its computation.
+#   structural_decay_radius 2 fired 161 times against v2's 60, and 4 steps could
+#     not recover what it blurred, so softness accumulated down the chain.
+#
+# Subject, pacing, armature and the six per-stage maps are UNCHANGED from v5,
+# which read best on subject. Only sharpness is being corrected.
+#
+# v4 diagnosis: the waterline itself was moving, which is where the horizon
+# artefacts came from, and the foreground kept eating the frame. Cause: the
+# depth map gave the water a grey value, and ANY grey there reads as a surface
+# to stand things on. Steep ramp -> receding lawn; flat mid -> field.
+#
+# v5 makes the water BLACK, i.e. unconstrained, and asserts only a stable
+# armature that is identical in all five maps: Staten Island's shore across the
+# foreground with the crag on it, and Manhattan's low strip of land at a fixed
+# horizon. Only the skyline standing on that strip changes per stage.
+#
+# Stage III also gets real breathing room: 52 of 161 keyframes, about 40 s of
+# Consummation, against 34 in v4.
+#
+# Two things this needs that the pipeline could not express until now:
+#
+#   1. UNEVEN PACING. `frames.steady` was one global number, so every stage got
+#      identical screen time and nothing could linger. `steady_per_segment` now
+#      gives stage III more than twice stage IV's duration: the peak breathes,
+#      the collapse is quick, the ruin rests.
+#
+#   2. A DIFFERENT MAP PER STAGE. `control.image` was a single fixed map, which
+#      is why v2 put a city in the Savage State: one geometry was forced on all
+#      five stages. `control.images` now cross-fades six maps on the same `t` the
+#      prompt embeddings use, so structure and text change together.
+#      The crag, the two headlands and Liberty's island sit at IDENTICAL
+#      coordinates in every map, which is what makes them persist; only the far
+#      shore differs. Stage I has no skyline at all, stage III is a dense modern
+#      Manhattan of slender towers, stage V is stumps.
+#
+# Water was also flattened in the depth maps: at control 0.70 a near-bright /
+# far-dark ramp is geometrically identical to a field, and v2's bay came back as
+# grassland. Control dropped 0.70 -> 0.60 for the same reason.
+#
+# Strengths sit between v2's 0.44 (scored image 9) and v3a's 0.34 (image 8),
+# because doubling keyframe count needs a proportional reduction and v3a
+# overshot it.
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome"
+
+subject:
+  name: empire_v7_flat
+  prompts:
+    - label: "I: Savage State"
+      prompt: >-
+        storm light breaking through heavy cloud, a wide bay seen from a rocky shore in the
+        foreground, a tall crag beside the viewer, a long low wooded strip of
+        land across the water, no buildings
+    # Rewritten: v1-v3 gave Arcadian one bland line and it read as generic green.
+    # Cole's Arcadian is a peopled idyll, so it needs figures and a temple.
+    - label: "II: Arcadian"
+      prompt: >-
+        soft green morning light, shepherds and sheep on a rocky shore in the
+        foreground, a tall crag beside the viewer, a small white temple on a low
+        strip of land across the water
+    # MODERN, explicitly. The LoRA resists it, so the map carries slender towers
+    # of widely varying height and the prompt names glass and steel outright.
+    - label: "III: Consummation (modern)"
+      prompt: >-
+        bright clear midday, a dense modern skyline of tall glass and steel
+        skyscrapers packed along a long low strip of land across the water, a
+        colossal robed statue with a torch on an island before it
+    - label: "IV: Destruction"
+      prompt: >-
+        red firelight and black smoke, the skyline of tall towers on the low
+        strip of land across the water burning and collapsing, a colossal robed
+        statue on an island before it, smoke pouring over the bay
+    - label: "V: Desolation"
+      negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome, golden hour, sunset, warm light, fire, foliage, overgrown"
+      prompt: >-
+        cold blue moonlight, deep indigo shadow, the broken remains of a
+        colossal statue on an island, ruined towers on the low strip of land
+        across the water, empty still black water, no people
+    - label: "I (return)"
+      prompt: >-
+        storm light breaking through heavy cloud, a wide bay seen from a rocky shore in the
+        foreground, a tall crag beside the viewer, a long low wooded strip of
+        land across the water, no buildings
+
+resolution:
+  width: 1344
+  height: 768
+
+# Segment n renders prompt n on its steady frames, so the list maps to stages
+# I, II, III, IV, V. III breathes at 34, IV collapses fast at 12, V rests at 24.
+# K = (12+10)+(16+12)+(34+10)+(12+12)+(24+14)+1 = 157 -> 157*23-1 = 3610 frames
+# -> 120.3 s at 30 fps.
+frames:
+  steady: 16
+  transition: 11
+  return_: 21
+  warmup: 3
+  steady_per_segment:     [15, 21, 80, 18, 34]
+  transition_per_segment: [12, 15, 12, 15,  0]
+
+render:
+  structural_decay_radius: 1
+  steady_strengths: [0.42, 0.42, 0.44, 0.42, 0.42, 0.46, 0.42, 0.44]
+  transition_strength: 0.43
+  # Content-drift loop closure. At K=157 the return is 9% of the clip, well
+  # inside the regime narrative-arc-drift.md validated, and v2 scored loop 10/10
+  # with these values.
+  return_pixel_blend_max: 0.55
+  return_strength_end: 0.45
+
+sampling:
+  num_inference_steps: 12
+  guidance_scale: 1.5
+
+control:
+  model: diffusers/controlnet-depth-sdxl-1.0
+  # Six maps for six prompts. The last repeats the first so the geometry closes
+  # the loop exactly as the prompt does.
+  images:
+    - outputs/_anchors/v5-savage.png
+    - outputs/_anchors/v5-arcadian.png
+    - outputs/_anchors/v5-modern.png
+    - outputs/_anchors/v5-destruction.png
+    - outputs/_anchors/v5-desolation.png
+    - outputs/_anchors/v5-savage.png
+  scale: 0.65
+  guidance_start: 0.0
+  guidance_end: 0.6
+
+# passes 5 / skip 4 = 23 invented frames per pair instead of 47, which lifted
+# mid-pair sharpness from 68% to 77% in v3a.
+rife:
+  passes: 5
+  skip_boundary: 8
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/empire

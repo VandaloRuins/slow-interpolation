@@ -1,0 +1,77 @@
+# Course of Empire on Times Square: DESOLATION
+#
+# Anchor: the WEDGE at the fork of the two roads, carried across every stage.
+# Substance changes (rock -> built -> ruin), silhouette and position do not.
+# Settings are rd's, the step-ladder winner. Drift is light only.
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.75
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, people, crowds, figures"
+
+subject:
+  name: mot_m1_loopfix
+  prompts:
+    - label: "A: desolation, moonlight"
+      prompt: >-
+        cold moonlight, a ruined wedge of masonry at the fork of two overgrown roads, ivy and broken columns, still water, empty and silent, seen from the ground
+    - label: "B: desolation, dusk"
+      prompt: >-
+        last violet dusk light, a ruined wedge of masonry at the fork of two overgrown roads, ivy and broken columns, still water, empty and silent, seen from the ground
+    - label: "A (return)"
+      prompt: >-
+        cold moonlight, a ruined wedge of masonry at the fork of two overgrown roads, ivy and broken columns, still water, empty and silent, seen from the ground
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 2
+  transition: 1
+  return_: 4
+  warmup: 3
+
+render:
+  return_pixel_blend_max: 0.45
+  return_strength_end: 0.45
+
+sampling:
+  num_inference_steps: 4
+  guidance_scale: 1.5
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/motion

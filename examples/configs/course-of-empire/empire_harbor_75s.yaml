@@ -1,0 +1,136 @@
+# THE COURSE OF EMPIRE, all five stages, across the Narrows. ~75 s.
+#
+# Why this works now and did not before. The blocking finding was that a CONTENT
+# arc cannot read as slow drift in TEN seconds (workstreams/quality-first L9): a
+# five-state narrative at K=7 becomes time-lapse. At 48 keyframes over 75 s there
+# is runway, and this is the regime narrative-arc-drift.md was actually tuned
+# for, at K=39. So the loop-closure recipe there applies directly, unlike the two
+# failed attempts to use it at small K.
+#
+# Composition: Cole's own vantage. Every canvas in the cycle looks across a bay
+# from a raised wooded foreground toward a far shore, with one rock landmark that
+# outlasts the empire. The Manhattan-from-Staten-Island view is that composition
+# already, which is why it transplants without forcing.
+#
+# The crag on the near headland is the recurring reference, held by the depth
+# map, and it is the only thing that does not change across the five stages.
+#
+# Settings inherit cn_d3_s55_soft_calm, the best-scoring render of the project
+# (30/40, motion 9, loop 10): ControlNet depth at 0.55 released at 0.6, softened
+# map, 12 steps with LOWERED strengths to compensate. Steps and strength must
+# move in opposite directions or the extra authority per frame becomes drift.
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  # `golden hour, sunset` is deliberately NOT excluded here, unlike the palette
+  # sweep: Destruction legitimately needs fire. The anti-varnish terms stay.
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome, red brick, brickwork"
+
+subject:
+  name: empire_harbor_75s
+  # Five stages plus a return to the first, so six prompts and five segments.
+  # Light term first (CLIP truncation guard), then the SHARED anchor clause so
+  # the crag and the headland persist, then what changes.
+  prompts:
+    - label: "I: Savage State"
+      prompt: >-
+        storm light breaking through heavy cloud, a great bay seen from a rocky
+        wooded headland, a tall crag on the near shore, dense forest to the
+        waterline, no buildings
+    - label: "II: Arcadian"
+      prompt: >-
+        clear pale morning light, a great bay seen from a rocky wooded headland,
+        a tall crag on the near shore, cleared pastures and a few small white
+        temples on the far shore
+    - label: "III: Consummation"
+      prompt: >-
+        bright silver midday, a great bay seen from a rocky wooded headland, a
+        tall crag on the near shore, a vast white marble city crowding the far
+        shore, colonnades and ships
+    - label: "IV: Destruction"
+      prompt: >-
+        red firelight and black smoke, a great bay seen from a rocky wooded
+        headland, a tall crag on the near shore, the marble city burning and
+        collapsing, ships aflame
+    - label: "V: Desolation"
+      prompt: >-
+        cold moonlight, a great bay seen from a rocky wooded headland, a tall
+        crag on the near shore, broken white columns overgrown with ivy, empty
+        still water, no people
+    - label: "I (return)"
+      prompt: >-
+        storm light breaking through heavy cloud, a great bay seen from a rocky
+        wooded headland, a tall crag on the near shore, dense forest to the
+        waterline, no buildings
+
+resolution:
+  width: 1344
+  height: 768
+
+# 5 segments: K = 5*5 + 4*3 + 10 + 1 = 48 keyframes -> 48*47-1 = 2255 frames
+# -> 75.2 s at 30 fps. `return_: 10` is narrative-arc-drift.md's content-drift
+# recipe. It failed twice at K=7-10 because the return then dominated the whole
+# clip; here it is 10 of 48, roughly the 26% the finding was validated at.
+frames:
+  steady: 5
+  transition: 3
+  return_: 10
+  warmup: 3
+
+render:
+  # cn_d3's strengths, which produced motion 9/10 and loop 10/10.
+  steady_strengths: [0.44, 0.44, 0.46, 0.44, 0.44, 0.48, 0.44, 0.46]
+  # Raised above cn_d3's 0.46: the stages have to actually ARRIVE, and a content
+  # change needs more authority at the segment boundary than a light drift does.
+  transition_strength: 0.55
+  # Content-drift loop closure, per the finding.
+  return_pixel_blend_max: 0.55
+  return_strength_end: 0.45
+
+sampling:
+  num_inference_steps: 12
+  guidance_scale: 1.5
+
+control:
+  model: diffusers/controlnet-depth-sdxl-1.0
+  image: outputs/_anchors/harbor-depth-soft.png
+  scale: 0.55
+  guidance_start: 0.0
+  guidance_end: 0.6
+
+rife:
+  passes: 6
+  skip_boundary: 8
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/empire

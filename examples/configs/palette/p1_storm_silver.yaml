@@ -1,0 +1,81 @@
+# Palette correction: The Oxbow's storm half: slate, pewter, cool green. No warm cast anywhere.
+#
+# Diagnosis: every earlier prompt named amber / golden / ochre / umber, and the
+# best-scoring prefix literally said "luminous golden light and deep umber
+# shadow". The terracotta was being demanded, not discovered. The anchor sketch
+# also carried a warm glow; it is neutral grey now. Negative additionally fights
+# the auction-catalogue varnish cast (documented for Renoir; Cole is sourced the
+# same way, and aged varnish makes every reproduction browner than the painting).
+#
+# Settings are T2's winner: anchor at 0.50, lora_scale 0.90, skip_boundary 8.
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, orange cast, brown monochrome, golden hour, sunset"
+
+subject:
+  name: pal_p1_storm_silver
+  prompts:
+    - label: "A"
+      prompt: >-
+        cold silver storm light breaking through heavy cloud, two great avenues converging into a narrow triangular plaza, a tall wedge tower at the apex crowned with a sphere, dark buildings framing both sides
+    - label: "B"
+      prompt: >-
+        clearing pale daylight after rain, two great avenues converging into a narrow triangular plaza, a tall wedge tower at the apex crowned with a sphere, dark buildings framing both sides
+    - label: "A (return)"
+      prompt: >-
+        cold silver storm light breaking through heavy cloud, two great avenues converging into a narrow triangular plaza, a tall wedge tower at the apex crowned with a sphere, dark buildings framing both sides
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 2
+  transition: 1
+  return_: 1
+  warmup: 3
+
+sampling:
+  num_inference_steps: 4
+  guidance_scale: 1.5
+
+rife:
+  passes: 6
+  skip_boundary: 8
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/palette
+
+anchor_image: outputs/_anchors/times-square-neutral.png
+anchor_strength: 0.5

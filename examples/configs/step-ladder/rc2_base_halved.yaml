@@ -1,0 +1,93 @@
+# Step ladder rung: SDXL base, 30 steps, g7, halved
+#
+# Isolates: the same, with the modal workstream's predicted schedule recalibration. Without this, a bad rung c is unattributable
+#
+# Part of the 2026-08-07 step-ladder batch. See
+# docs/findings/denoise-step-budget.md Finding 2 and
+# docs/planning/workstreams/quality-first/progress.md T1.
+#
+# Every rung is identical except the lines marked CHANGED. Judge keyframe
+# 0000 against 0006 in gallery.html: 0000 reads surface quality, the pair
+# reads whether quality survives the chain. Sweep resolution 1344x768, NOT
+# a delivery bucket.
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.75
+  prefix: "tcole, romantic landscape oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, decorative arch around the edge, vignette, text, watermark, signature, people, figures, modern buildings, signage, cars"
+
+subject:
+  name: ladder_rc2_base_halved
+  prompts:
+    - label: "A: arcade amber"
+      prompt: >-
+        warm amber afternoon light, a long ruined Roman aqueduct arcade
+        spanning the full width, a rhythm of many crumbling brick arches
+        receding, dark weathered stone, luminous green valley and hazy blue
+        mountains through every opening
+    - label: "B: arcade golden"
+      prompt: >-
+        low golden hour light, a long ruined Roman aqueduct arcade spanning the
+        full width, a rhythm of many crumbling brick arches receding, dark
+        weathered stone, luminous valley and burning gold mountains through
+        every opening
+    - label: "A (return)"
+      prompt: >-
+        warm amber afternoon light, a long ruined Roman aqueduct arcade
+        spanning the full width, a rhythm of many crumbling brick arches
+        receding, dark weathered stone, luminous green valley and hazy blue
+        mountains through every opening
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 2
+  transition: 1
+  return_: 1
+  warmup: 3
+
+render:
+  steady_strengths: [0.30, 0.30, 0.32, 0.30, 0.30, 0.34, 0.30, 0.32]
+  transition_strength: 0.40
+
+sampling:
+  num_inference_steps: 30
+  guidance_scale: 7.0
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: null
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: tiny
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/step-ladder

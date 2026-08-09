@@ -1,0 +1,74 @@
+# Times Square CONSUMMATION v3: same prompt at 0.90. Isolates lora_scale, the dial that has never been swept
+#
+# Anchor now names the bowtie explicitly: two avenues converging into a
+# triangular plaza, wedge tower at the apex, crowned with a sphere.
+# Palette forced by bracketing the luminous centre with "dark buildings
+# framing both sides" and "hazy blue distance".
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.9
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, flat lighting"
+
+subject:
+  name: coe_ts_v3_s090
+  prompts:
+    - label: "A: dusk"
+      prompt: >-
+        warm amber dusk, two great avenues converging into a narrow triangular plaza, a tall wedge tower at the apex crowned with a sphere, tiers of luminous signs, dark buildings framing both sides, hazy blue distance
+    - label: "B: night blaze"
+      prompt: >-
+        blazing golden night, two great avenues converging into a narrow triangular plaza, a tall wedge tower at the apex crowned with a sphere, tiers of burning signs, dark buildings framing both sides, hazy blue distance
+    - label: "A (return)"
+      prompt: >-
+        warm amber dusk, two great avenues converging into a narrow triangular plaza, a tall wedge tower at the apex crowned with a sphere, tiers of luminous signs, dark buildings framing both sides, hazy blue distance
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 2
+  transition: 1
+  return_: 1
+  warmup: 3
+
+sampling:
+  num_inference_steps: 4
+  guidance_scale: 1.5
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/course-of-empire

@@ -361,6 +361,42 @@ docstring + the helper function comments,
 [`../planning/workstreams/modal/progress.md`](../planning/workstreams/modal/progress.md)
 2026-05-19 log entry.
 
+### 12. `modal token current` does not exist; the command is `modal profile current`
+
+**Symptom**: an agent checking whether Modal is authenticated runs
+`modal token current`, gets `Error: No such command 'current'` and a
+non-zero exit, concludes the account is not authenticated, and pushes
+the user into a signup flow they do not need. Worst case it reports
+"Modal is not installed" in a handover doc and the next session
+believes it.
+
+**Cause**: `modal token` has subcommands `new` and `set`, but no
+`current`. Verified against **client 1.4.2**, the version this repo
+pins. Account identity lives under `modal profile`:
+
+```bash
+modal profile current    # prints the active workspace name, exit 0
+modal profile list       # all configured profiles, marks the active one
+```
+
+**This happened.** [`../manual/modal-operations.md`](../manual/modal-operations.md)
+carried `modal token current` in three places (the auth pre-check, the
+signup verification step, and the "things you never do" list). The NYC
+billboard handover of 2026-08-07 recorded "modal is not installed in
+the active Python env" as a blocker; Modal was in fact installed,
+authenticated and working. Fixed 2026-08-07.
+
+**Related trap on this machine**: `import modal` fails under the
+repo's active Python 3.10 while the `modal` CLI runs under 3.11.
+`modal run -m cloud.X` works regardless, because it executes under the
+CLI's own interpreter. So **`import modal` failing proves nothing
+about whether you can dispatch.** Test dispatch capability with
+`modal profile current`, not with an import.
+
+**Rule**: never conclude "no Modal account" from a single non-zero
+exit. Confirm with `modal profile current` and with
+`test -f ~/.modal.toml` before branching into signup.
+
 ## General defensive patterns that emerged
 
 - **`getattr` with default for any Modal / hf-hub attribute access** that

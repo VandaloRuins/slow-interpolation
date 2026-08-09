@@ -1,0 +1,73 @@
+# Course of Empire on Times Square: CONSUMMATION MODERN
+#
+# Anchor: the WEDGE at the fork of the two roads, carried across every stage.
+# Substance changes (rock -> built -> ruin), silhouette and position do not.
+# Settings are rd's, the step-ladder winner. Drift is light only.
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.55
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry"
+
+subject:
+  name: coe_consummation_modern
+  prompts:
+    - label: "A: modern, dusk"
+      prompt: >-
+        deep blue dusk light, a towering wedge-shaped tower at the fork of two avenues, immense glowing electric signs covering every facade, dense crowds, seen from the street
+    - label: "B: modern, electric"
+      prompt: >-
+        blazing white electric night, a towering wedge-shaped tower at the fork of two avenues, immense glowing electric signs covering every facade, dense crowds, seen from the street
+    - label: "A (return)"
+      prompt: >-
+        deep blue dusk light, a towering wedge-shaped tower at the fork of two avenues, immense glowing electric signs covering every facade, dense crowds, seen from the street
+
+resolution:
+  width: 1344
+  height: 768
+
+frames:
+  steady: 2
+  transition: 1
+  return_: 1
+  warmup: 3
+
+sampling:
+  num_inference_steps: 4
+  guidance_scale: 1.5
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/course-of-empire

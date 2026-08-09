@@ -1,0 +1,146 @@
+# THE COURSE OF EMPIRE v2, all five stages across the Narrows. ~94 s.
+#
+# Three changes, each from a measurement on v1:
+#   transition 3 -> 6   spike clusters sat on the stage changes (10 at
+#                       t=20-22s), and mid-pair frames measured 64% as
+#                       sharp as keyframe-adjacent ones. Same fix for both.
+#   control 0.55 -> 0.70  0.55 was tuned at K=7 and could not hold
+#                       structure over 48 keyframes; the crag drifted MORE
+#                       than the frame average (33.2 vs 30.1).
+#   Manhattan + Liberty named in the prompt AND drawn into the depth map.
+#   Neither had ever been asked for, in either place.
+#
+# Why this works now and did not before. The blocking finding was that a CONTENT
+# arc cannot read as slow drift in TEN seconds (workstreams/quality-first L9): a
+# five-state narrative at K=7 becomes time-lapse. At 48 keyframes over 75 s there
+# is runway, and this is the regime narrative-arc-drift.md was actually tuned
+# for, at K=39. So the loop-closure recipe there applies directly, unlike the two
+# failed attempts to use it at small K.
+#
+# Composition: Cole's own vantage. Every canvas in the cycle looks across a bay
+# from a raised wooded foreground toward a far shore, with one rock landmark that
+# outlasts the empire. The Manhattan-from-Staten-Island view is that composition
+# already, which is why it transplants without forcing.
+#
+# The crag on the near headland is the recurring reference, held by the depth
+# map, and it is the only thing that does not change across the five stages.
+#
+# Settings inherit cn_d3_s55_soft_calm, the best-scoring render of the project
+# (30/40, motion 9, loop 10): ControlNet depth at 0.55 released at 0.6, softened
+# map, 12 steps with LOWERED strengths to compensate. Steps and strength must
+# move in opposite directions or the extra authority per frame becomes drift.
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  # `golden hour, sunset` is deliberately NOT excluded here, unlike the palette
+  # sweep: Destruction legitimately needs fire. The anti-varnish terms stay.
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome, red brick, brickwork"
+
+subject:
+  name: empire_harbor_v2
+  # Five stages plus a return to the first, so six prompts and five segments.
+  # Light term first (CLIP truncation guard), then the SHARED anchor clause so
+  # the crag and the headland persist, then what changes.
+  prompts:
+    - label: "I: Savage State"
+      prompt: >-
+        storm light breaking through heavy cloud, a great bay seen from a rocky
+        wooded headland, a tall crag on the near shore, dense forest to the
+        waterline, no buildings
+    - label: "II: Arcadian"
+      prompt: >-
+        clear pale morning light, a great bay seen from a rocky wooded headland,
+        a tall crag on the near shore, cleared pastures and a few small white
+        temples on the far shore
+    - label: "III: Consummation"
+      prompt: >-
+        bright silver midday, a colossal robed statue holding a torch aloft on
+        an island, a vast white marble city of towers crowding the far shore
+        behind it, seen across the bay from a rocky headland
+    - label: "IV: Destruction"
+      prompt: >-
+        red firelight and black smoke, a colossal robed statue holding a torch
+        on an island, the white marble city of towers behind it burning and
+        collapsing, seen across the bay from a rocky headland
+    - label: "V: Desolation"
+      prompt: >-
+        cold moonlight, the broken remains of a colossal statue on an island,
+        ruined marble towers overgrown with ivy on the far shore, empty still
+        water, seen across the bay from a rocky headland
+    - label: "I (return)"
+      prompt: >-
+        storm light breaking through heavy cloud, a great bay seen from a rocky
+        wooded headland, a tall crag on the near shore, dense forest to the
+        waterline, no buildings
+
+resolution:
+  width: 1344
+  height: 768
+
+# 5 segments: K = 5*5 + 4*3 + 10 + 1 = 48 keyframes -> 48*47-1 = 2255 frames
+# -> 75.2 s at 30 fps. `return_: 10` is narrative-arc-drift.md's content-drift
+# recipe. It failed twice at K=7-10 because the return then dominated the whole
+# clip; here it is 10 of 48, roughly the 26% the finding was validated at.
+frames:
+  steady: 5
+  transition: 6
+  return_: 10
+  warmup: 3
+
+render:
+  # cn_d3's strengths, which produced motion 9/10 and loop 10/10.
+  steady_strengths: [0.44, 0.44, 0.46, 0.44, 0.44, 0.48, 0.44, 0.46]
+  # Raised above cn_d3's 0.46: the stages have to actually ARRIVE, and a content
+  # change needs more authority at the segment boundary than a light drift does.
+  transition_strength: 0.55
+  # Content-drift loop closure, per the finding.
+  return_pixel_blend_max: 0.55
+  return_strength_end: 0.45
+
+sampling:
+  num_inference_steps: 12
+  guidance_scale: 1.5
+
+control:
+  model: diffusers/controlnet-depth-sdxl-1.0
+  image: outputs/_anchors/harbor-depth-v2.png
+  scale: 0.70
+  guidance_start: 0.0
+  guidance_end: 0.6
+
+rife:
+  passes: 6
+  skip_boundary: 8
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/empire
