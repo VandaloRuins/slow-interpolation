@@ -356,6 +356,18 @@ class PipelineConfig:
     anchor_image: Path | None = None
     anchor_strength: float = 0.65
 
+    # Reproducibility. Left at None the warmup canvas comes from an unseeded
+    # `np.random.randint` and no generator reaches the pipeline, so a render is
+    # a one-off: re-running the same config gives a different picture and a
+    # composition you liked cannot be recovered except by pointing
+    # `anchor_image` at a frame of the render that produced it. Set an int and
+    # both the canvas and the sampler become deterministic, which is what makes
+    # a delivery iterable (change one dial, keep the picture).
+    #
+    # Determinism is per (seed, config, hardware): the same seed on a different
+    # GPU or a different diffusers build will not match frame for frame.
+    seed: int | None = None
+
 
 # ---------------------------------------------------------------------------
 # YAML loader
@@ -455,6 +467,8 @@ def load_pipeline_config(path: str | Path) -> PipelineConfig:
     anchor_raw = raw.get("anchor_image")
     anchor_image = Path(anchor_raw).expanduser() if anchor_raw else None
     anchor_strength = float(raw.get("anchor_strength", 0.65))
+    seed_raw = raw.get("seed")
+    seed = int(seed_raw) if seed_raw is not None else None
 
     return PipelineConfig(
         style=style,
@@ -472,4 +486,5 @@ def load_pipeline_config(path: str | Path) -> PipelineConfig:
         output_name=output_name,
         anchor_image=anchor_image,
         anchor_strength=anchor_strength,
+        seed=seed,
     )

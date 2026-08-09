@@ -1,0 +1,131 @@
+# LED wall, screen B, second pass. 1728 x 540, 16:5, 10.000 s, 30 fps.
+#
+# v1 was technically perfect and artistically half-right. Three things were
+# wrong and this config addresses all three.
+#
+# 1. THE DRIFT WAS A TRANSFORMATION, NOT A DRIFT. Frames 0 and 299 matched, so
+#    the loop closed, but frame 150 was a different picture: the waterline was
+#    gone and trees had grown. Two causes, both fixed here. The subject clause
+#    now differs by ZERO characters between the two prompts, so only the light
+#    adjective moves; in v1 "wide grey bay" against "wide silver bay" plus a
+#    changed cloud descriptor was a wider semantic jump than it looked. And
+#    each prompt now gets 5 steady frames instead of 4 with only 1 transition,
+#    so the chain settles into a prompt instead of being permanently in transit.
+#    Total drift budget drops from 15 x 0.36 = 5.4 to 15 x 0.30 = 4.5, against
+#    the banked files' 7 x 0.55 = 3.85.
+#
+# 2. CONTROLNET IS GONE. v1's depth map was about 75% black, which tells the
+#    model "everything is far" and is not a constraint at all: it never set the
+#    horizon and did not even hold the crag on the left. The composition came
+#    from the prompt. Worse, now that the composition is carried by
+#    `anchor_image`, the old map would actively FIGHT it (map says crag left,
+#    anchor says crag centre-right). A conflicting constraint is worse than
+#    none. The maps and the lesson stay in tools/make_massing.py for whenever
+#    one is authored with real near-field structure, as the empire maps had.
+#
+# 3. THE COMPOSITION IS PINNED BY ANCHOR, BECAUSE IT CANNOT BE RE-ROLLED.
+#    v1's renders were unseeded and therefore one-offs. `seed` now exists, but
+#    it cannot recover a picture made before it existed, so v1 frame 0 is fed
+#    back in as `anchor_image`.
+#
+#    NOTE `warmup: 1`. The warmup loop runs pass 0 at `anchor_strength` and
+#    EVERY SUBSEQUENT PASS AT 0.75, which would repaint the anchored
+#    composition away. With an anchor, warmup must be 1.
+#
+# Conform with the crop that matches where the content actually sits. The
+# handover's --crop-y 0 was written for the arcade subject and is wrong here:
+#     python tools/conform.py --screen bc --crop-y 406 --src <render>.mp4
+
+seed: 1087
+
+anchor_image: outputs/_anchors/led-b-anchor.png
+anchor_strength: 0.65
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome, buildings, towers, city"
+
+subject:
+  name: led_b_savage_v2
+  # Light term first, subject clause byte-identical across all three prompts.
+  # The ONLY difference is "dim" against "bright storm light breaking".
+  # Measured 47 and 48 tokens on both SDXL tokenizers.
+  prompts:
+    - label: "A: dim storm light"
+      prompt: >-
+        dim storm light through heavy cloud, a great rocky crag rising from the
+        surf, a wide grey bay, a long low wooded shore far across the water, no
+        buildings
+    - label: "B: bright storm light"
+      prompt: >-
+        bright storm light breaking through heavy cloud, a great rocky crag
+        rising from the surf, a wide grey bay, a long low wooded shore far
+        across the water, no buildings
+    - label: "A (return)"
+      prompt: >-
+        dim storm light through heavy cloud, a great rocky crag rising from the
+        surf, a wide grey bay, a long low wooded shore far across the water, no
+        buildings
+
+resolution:
+  width: 1536
+  height: 896
+
+# K = (5+1) + (5+3) + 1 = 15, raw = 15 * 23 - 1 = 344, retimed to 300.
+frames:
+  steady: 5
+  transition: 1
+  return_: 3
+  warmup: 1
+
+render:
+  structural_decay_radius: 1
+  # 8 real steps: int(28 * 0.30) = 8, band [0.2857, 0.3214). Transition at 0.31
+  # stays in the same band rather than jumping to 9, because with the subject
+  # clause identical there is nothing for a stronger transition to do.
+  steady_strengths: [0.30, 0.30, 0.31, 0.30, 0.30, 0.31, 0.30, 0.31]
+  transition_strength: 0.31
+  return_strength_start: 0.30
+  return_strength_end: 0.26
+  return_pixel_blend_max: 0.35
+
+sampling:
+  num_inference_steps: 28
+  guidance_scale: 1.5
+
+rife:
+  passes: 5
+  skip_boundary: 4
+  edge_crop: 8
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/nyc-billboard/led

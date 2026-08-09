@@ -1,0 +1,103 @@
+# LED wall, screen C, second pass. 1728 x 540, 16:5, 10.000 s, 30 fps.
+# Same three corrections as led_b_savage_v2.yaml; read that header first.
+#
+# C was the strongest of the v1 renders (moonlight, a dark far shore, broken
+# stumps standing in still water, the crag at the right) and also the clearest
+# demonstration of the drift problem: frame 150 had drifted to a pale warm
+# daylight scene with the moon gone. The culprit was "pale silver moonlight",
+# which the model reads as daylight rather than as a moonlit variant. The
+# second prompt is now "brighter blue" instead, which stays inside night.
+#
+#     python tools/conform.py --screen bc --crop-y 406 --src <render>.mp4
+
+seed: 1087
+
+anchor_image: outputs/_anchors/led-c-anchor.png
+anchor_strength: 0.65
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  # The Cole LoRA's distribution pulls hard toward golden hour, so a night
+  # stage has to suppress it explicitly or the whole stage warms up. This is
+  # doing double duty now that the drift itself is a night-to-night move.
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome, golden hour, sunset, warm light, daylight, fire, foliage"
+
+subject:
+  name: led_c_desolation_v2
+  # Subject clause byte-identical. Only "deep" against "brighter" moves.
+  # Measured 46 tokens on both SDXL tokenizers.
+  prompts:
+    - label: "A: deep blue moonlight"
+      prompt: >-
+        deep blue moonlight, a great rocky crag rising on the right, still
+        black water, broken ruined towers on a low shore far across the water,
+        empty, no people
+    - label: "B: brighter blue moonlight"
+      prompt: >-
+        brighter blue moonlight, a great rocky crag rising on the right, still
+        black water, broken ruined towers on a low shore far across the water,
+        empty, no people
+    - label: "A (return)"
+      prompt: >-
+        deep blue moonlight, a great rocky crag rising on the right, still
+        black water, broken ruined towers on a low shore far across the water,
+        empty, no people
+
+resolution:
+  width: 1536
+  height: 896
+
+frames:
+  steady: 5
+  transition: 1
+  return_: 3
+  warmup: 1
+
+render:
+  structural_decay_radius: 1
+  steady_strengths: [0.30, 0.30, 0.31, 0.30, 0.30, 0.31, 0.30, 0.31]
+  transition_strength: 0.31
+  return_strength_start: 0.30
+  return_strength_end: 0.26
+  return_pixel_blend_max: 0.35
+
+sampling:
+  num_inference_steps: 28
+  guidance_scale: 1.5
+
+rife:
+  passes: 5
+  skip_boundary: 4
+  edge_crop: 8
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/nyc-billboard/led

@@ -177,8 +177,9 @@ def unload_sdxl_pipeline(pipe: Any) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _random_noise_image(width: int, height: int) -> Image.Image:
-    arr = np.random.randint(0, 256, (height, width, 3), dtype=np.uint8)
+def _random_noise_image(width: int, height: int, seed: int | None = None) -> Image.Image:
+    rng = np.random.default_rng(seed)
+    arr = rng.integers(0, 256, (height, width, 3), dtype=np.uint8)
     return Image.fromarray(arr)
 
 
@@ -255,7 +256,16 @@ def generate_keyframes(
         return {"negative_prompt_embeds": ne, "negative_pooled_prompt_embeds": np_}
 
     n_segments = len(subject.prompts) - 1
-    current_img = _random_noise_image(res.width, res.height)
+    current_img = _random_noise_image(res.width, res.height, config.seed)
+    # One generator threaded through every call, so the SEQUENCE of samples is
+    # what is reproducible, not each call in isolation. Left None the sampler
+    # falls back to global torch RNG and the render is a one-off.
+    generator = (
+        torch.Generator(device=pipe.device).manual_seed(config.seed)
+        if config.seed is not None else None
+    )
+    if config.seed is not None:
+        print(f"[keyframes] seeded, seed={config.seed}")
     frame_idx = 0
 
     # Control map loaded once; it is FIXED across every frame, which is what
@@ -304,12 +314,20 @@ def generate_keyframes(
         if lora_scale is not None:
             ctrl_kw["cross_attention_kwargs"] = {"scale": lora_scale}
         if ctrl is not None and ctrl_img is not None:
-            ctrl_kw = {
+            # `update`, NOT reassignment. This branch used to replace the dict
+            # wholesale, which silently dropped `cross_attention_kwargs`
+            # whenever a control map was present. Since that is the only
+            # mechanism carrying `lora_scale_per_segment` to the model (the
+            # keep_live path sets one scale via `set_adapters` for the whole
+            # render), any config combining per-segment scales with ControlNet
+            # ran entirely at the base `lora_scale`. empire_v10_dualsource is
+            # exactly that combination; see the note in its own comment header.
+            ctrl_kw.update({
                 "control_image": ctrl_img,
                 "controlnet_conditioning_scale": ctrl.scale,
                 "control_guidance_start": ctrl.guidance_start,
                 "control_guidance_end": ctrl.guidance_end,
-            }
+            })
         result = pipe(
             **ctrl_kw,
             prompt_embeds=embeds,
@@ -317,6 +335,7 @@ def generate_keyframes(
             **cfg_kw,
             image=image,
             strength=strength,
+            generator=generator,
             num_inference_steps=num_inference_steps,
             guidance_scale=guidance_scale,
             crops_coords_top_left=borders.crops_coords_top_left,
