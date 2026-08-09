@@ -486,6 +486,113 @@ Cost is Modal dollars unless marked. "Unblocks" names what the result decides.
 - [findings/denoise-step-budget.md](../../../findings/denoise-step-budget.md).
 - Modal smoke re-verified after a three-month gap.
 
+## Session 2026-08-09: delivery-aspect authoring, and two code faults it exposed
+
+Paused mid-session at Luca's request. **Read L16 before trusting L-anything about
+v10, and read L17 before authoring any anchored render.**
+
+### L16. v10 was a no-op, so the headline of `chained-diffusion-limits.md` is unsupported
+
+`_pipe_call` in [keyframes.py](../../../../src/slow_interpolation/keyframes.py) built
+`ctrl_kw`, put `cross_attention_kwargs` in it to carry `lora_scale_per_segment`, then the
+ControlNet branch **reassigned** the dict instead of updating it. That is the only path
+carrying per-segment scale to the model: the `keep_live` route calls `set_adapters` once
+with a single scale for the whole render.
+
+`empire_v10_dualsource.yaml` sets `lora_scale_per_segment: [0.90, 0.90, 0.40, 0.45, 0.85]`
+**and** `control.images`, with base `lora_scale: 0.90`. Every frame ran at 0.90. Nothing
+was halved.
+
+So "halving `lora_scale` on the city stages changed instability by 0% (1.234 to 1.235),
+therefore the constraint is content complexity and not the LoRA" is not evidence about the
+LoRA. A 0% change is the signature of a no-op. That experiment is the **sole** support for
+the headline of [findings/chained-diffusion-limits.md](../../../findings/chained-diffusion-limits.md),
+which currently reads as settled.
+
+**Status is untested, not refuted.** The v9 result (fewer, larger, hazier masses scored
+best) is independent of this and still stands. Fixed in `079598d4c`; the experiment needs
+re-running before the finding can be relied on. Nobody has edited the finding doc: rewriting
+a shipped conclusion is Luca's call.
+
+### L17. `warmup` > 1 largely defeats `anchor_image`
+
+The warmup loop runs pass 0 at `anchor_strength` and **every later pass at a hardcoded
+0.75**, which repaints the composition the anchor existed to preserve. With an anchor,
+`warmup: 1`. Not a bug exactly, but it is undocumented and silently wastes the mechanism.
+
+### L18. There was no seed anywhere, so no render before today is reproducible
+
+The warmup canvas came from an unseeded `np.random.randint` and no `generator` reached the
+pipeline. Re-running a config gave a different picture, and a composition worth keeping
+could only be recovered by feeding a frame of its own render back in as `anchor_image`.
+`PipelineConfig.seed` now exists, defaults to `None` (old behaviour byte-for-byte), and
+threads both the canvas and a `torch.Generator`. 60 tests pass.
+
+This is why the v1 billboard compositions had to be anchored rather than re-rolled.
+
+### L19. A depth map that is mostly black is not a constraint
+
+The 1:3 and 16:5 maps authored this session were ~75% black, on an over-application of the
+v4 water rule (which was "no depth ramp in the water", not "black out most of the frame").
+At `scale: 0.65` ControlNet never set the horizon and did not hold the crag on the side the
+map specified; those compositions were prompt-driven. The empire maps worked because they
+blacked out only sky and bay and carried a bright near shore across the lower third.
+
+Corollary: an inert map is survivable, but a map that **disagrees** with an `anchor_image`
+is worse than none. Both were dropped from the second pass.
+
+### L20. Delivery-aspect geometry, measured
+
+With `edge_crop: 8`, verified end to end through `conform.py`:
+
+| Screen | Render | Crop | Delivered region of the render | Upscale |
+|---|---|---|---|---|
+| A 912x2736 | 896x1536 | 506x1520 at x=187 | central 506 px column, full height | 1.802x |
+| B/C 1728x540 | 1536x896 | 1520x474 | a 474 px band, 53% of the frame | 1.137x |
+
+**The handover's `--crop-y 0` is wrong for a bay subject.** It was written for the arcade,
+whose crowns sat at the top. A storm seascape puts its horizon low, so the band that works
+is the BOTTOM one, `--crop-y 406`. Pick the offset from a still every time; this is the
+second time that advice has paid.
+
+### L21. Two prompts 10 s apart is a transformation, not a drift
+
+v1 gave each prompt 4 steady frames and a semantically wider gap than it looked
+("pale silver moonlight" reads as daylight, not as a moonlit variant). Frames 0 and 299
+matched, so loop closure was excellent, but frame 150 was a different scene: C lost the
+moon and warmed to daylight, B lost its waterline and grew trees.
+
+The fix has three parts, none sufficient alone: the subject clause byte-identical between
+prompts so only the light adjective moves, `steady 5 / transition 1` so the chain settles
+into a prompt instead of being permanently in transit, and the drift budget down from
+15 x 0.36 = 5.4 to 15 x 0.30 = 4.5 (banked files are 7 x 0.55 = 3.85).
+
+### State at pause
+
+- **v1 batch:** 3/3, $0.16, all spec-verified. Conformed at the corrected crops into
+  `outputs/nyc-billboard/led/candidate/`. B and C are good images, A is flat and
+  off-concept. Drift is wrong on all three, per L21.
+- **v2 batch:** landed, 3/3, $0.1404. `led_a_storm`, `led_b_savage_v2`,
+  `led_c_desolation_v2` on the outputs volume. A drops the Consummation framing for
+  weather; B and C keep their v1 compositions via `anchor_image` at `warmup: 1`.
+  **NOT synced, NOT conformed, NOT looked at.** Nobody has seen these three yet.
+- **Open and unverified: did the seed actually take?** The `[keyframes] seeded, seed=1087`
+  line does not appear in the batch log. That is NOT evidence of failure: `[keyframes]`
+  lines do not appear in the v1 log either, including ones that certainly ran, so
+  `cloud/batch.py` is not forwarding container stdout for them. Inconclusive either way.
+  Cheapest check is to re-run one config unchanged and diff frame 0 against this run's.
+- **The three banked delivery files are untouched.** Nothing sent. No deadline risk.
+- Campaign name still the holding "SLOW INTERPOLATION". Landlord approval due 2026-08-28.
+
+### Next, in order
+
+1. `python tools/sync_outputs.py`, then conform and judge the v2 batch: does the drift now
+   read as light-only over 10 s. B and C at `--screen bc --crop-y 406`; A's crop has to be
+   picked by eye from a still, since it has no anchor and no map.
+2. Confirm the seed took, per the open item above. Everything downstream assumes it.
+3. Re-run the v10 experiment against the fixed code, then decide what
+   `chained-diffusion-limits.md` should say.
+
 ## Session 2026-08-08: the Course of Empire arc, v1 to v10
 
 Ten renders, ~$6.10. Distilled into
