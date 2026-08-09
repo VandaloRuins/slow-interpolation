@@ -128,6 +128,21 @@ class MotionConfig:
     mask_threshold: int = 60
     mask_feather: int = 24
     mask_invert: bool = False
+    # Advect only the high-frequency band above this blur sigma. 0 translates
+    # the whole region, which moves the SUBJECT rather than the texture through
+    # it and made attempt 1 a regression: the waterfall shortened from the top.
+    hp_sigma: float = 6.0
+    # Wrap the moving band rather than edge-filling it. Texture leaving the
+    # bottom re-enters at the top, which is right for a steady fall, removes the
+    # vacated strip and its artefacts, and closes the loop by construction.
+    cyclic: bool = True
+    # Coarse edge of the moving band. With this set, the advected band is
+    # blur(hp_sigma) minus blur(band_hi) rather than everything finer than
+    # hp_sigma. Measured on consecutive keyframes: finer than ~8 px does not
+    # survive img2img (r = 0.05 to 0.31) and cannot carry motion at all, while
+    # ~80 px and coarser is the silhouette and must stay put. So the usable
+    # band is roughly 10 to 80.
+    band_hi: float = 0.0
 
 
 @dataclass

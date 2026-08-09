@@ -199,7 +199,14 @@ def main() -> int:
         return 0
 
     print("\n" + " ".join(cmd))
-    return subprocess.run(cmd, check=False).returncode
+    # On Windows `vercel` is a .cmd shim, which CreateProcess cannot exec
+    # directly: subprocess raises WinError 2 "cannot find the file specified"
+    # even though the CLI is installed and on PATH. Resolve it properly.
+    exe = shutil.which(cmd[0])
+    if exe is None:
+        print("vercel CLI not found on PATH; npm i -g vercel", file=sys.stderr)
+        return 1
+    return subprocess.run([exe] + cmd[1:], check=False).returncode
 
 
 if __name__ == "__main__":

@@ -1,0 +1,157 @@
+# Attempt 3. Measured band survival between consecutive KEYFRAMES:
+#   finer than ~4 px  r=0.05     finer than ~8 px  r=0.15
+#   ~8 to 24 px       r=0.82     ~24 to 80 px      r=0.99
+# So content finer than ~8 px is RE-INVENTED every keyframe and cannot carry
+# motion at any strength. Attempt 2 advected exactly that band (hp_sigma 6,
+# no upper bound = everything finer than 6 px) and moved nothing: 99% of
+# frames identical. Attempt 1 advected everything including the silhouette
+# and the fall shortened from the top. The usable band is bounded on BOTH
+# sides, so this advects 10 to 80 px: coarse enough to survive the round
+# trip, fine enough not to be the envelope.
+#
+# LED wall, screen A. 912 x 2736, 1:3 PORTRAIT, 10.000 s, 30 fps.
+#
+# DIRECTIONAL MOTION, ATTEMPT 3 (band-pass). Attempt 1 (led4_a_fall) was a regression and
+# the reason is recorded in full in the quality-first log: it translated the
+# masked REGION rather than the texture through it, so the mask carried the top
+# edge of the fall downward and the waterfall visibly SHORTENED FROM ABOVE.
+# Measured afterwards, the water pattern never moved at all: median 0.00 px
+# between frames, 92% of frames identical, against an intended 5.0 px/frame.
+#
+# Two changes, both verified locally before spending anything. On a synthetic
+# fall with a fixed top edge, ten keyframes of advection moved the envelope
+# from y=153 to y=1431 under attempt 1, and from y=153 to y=151 under this one.
+#
+#   hp_sigma: 6   Split the moving region into a low band (the silhouette and
+#                 the large tonal masses) and a high band (streaks and foam),
+#                 and advect ONLY the high band. The fall's shape lives entirely
+#                 in the band that is held still, so its height is now
+#                 structurally incapable of changing.
+#
+#   cyclic: true  Wrap the moving band instead of edge-filling it, so texture
+#                 leaving the bottom re-enters at the top. Physically right for
+#                 a steady fall, it removes the vacated strip that produced the
+#                 artefacts, and it makes the loop close by construction: after
+#                 any number of steps the band is a rotation of itself rather
+#                 than an accumulating offset.
+#
+# STRENGTH IS THE OTHER OPEN VARIABLE and this pair is the sweep. Every tuning
+# decision in this project so far raised strength, because we were asking the
+# model to BUILD an image. Motion is the opposite problem: the content is
+# already right and needs to be PRESERVED while it moves. 92% of attempt 1's
+# frames coming back unchanged says the repaint erases what it is handed. The
+# companion config drops steady strength to 0.26 (5 real steps of 20) against
+# this one's 0.40 (8 steps).
+#
+# skip_boundary stays 0: it drops the invented frames nearest each keyframe,
+# which is right for content drift but inserts a positional jump into a rigid
+# translation.
+#
+#     python tools/conform.py --screen a --src <render>.mp4
+
+seed: 1087
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome, people, figures, buildings"
+
+subject:
+  name: led6_a_fall
+  # Light barely moves here on purpose. This render is testing MOTION, and a
+  # large light arc would confound the read. 40 and 43 tokens.
+  prompts:
+    - label: "A: grey daylight"
+      prompt: >-
+        soft grey daylight, a tall waterfall falling down a dark rocky gorge,
+        wet cliff walls either side, white spray at the foot, no people
+    - label: "B: sun into the gorge"
+      prompt: >-
+        pale sunlight breaking into the gorge, a tall waterfall falling down a
+        dark rocky gorge, wet cliff walls either side, white spray at the foot,
+        no people
+    - label: "A (return)"
+      prompt: >-
+        soft grey daylight, a tall waterfall falling down a dark rocky gorge,
+        wet cliff walls either side, white spray at the foot, no people
+
+resolution:
+  width: 896
+  height: 1536
+
+# K = (3+1) + (3+2) + 1 = 10 keyframes.
+# raw = K * (2^5 - 1 - 0) - 1 = 10 * 31 - 1 = 309, retimed to 300 (1.03x).
+frames:
+  steady: 3
+  transition: 1
+  return_: 2
+  warmup: 3
+
+# 154 px per keyframe over 10 keyframes = 1540 px against a 1536 px frame, so
+# the water traverses the full height exactly once across the loop. Per invented
+# frame that is 154/31 = 5.0 px, comfortably inside what optical flow tracks.
+motion:
+  dy: 154
+  dx: 0
+  hp_sigma: 10.0
+  band_hi: 80.0
+  cyclic: true
+  mask_threshold: 60
+  mask_feather: 24
+
+render:
+  structural_decay_radius: 1
+  steady_strengths: [0.40, 0.40, 0.42, 0.40, 0.40, 0.42, 0.40, 0.42]
+  transition_strength: 0.42
+  # Return behaves like a steady segment: no pixel pull toward the anchor,
+  # which would drag the water back up and fight the fall.
+  return_strength_start: 0.40
+  return_strength_end: 0.40
+  return_pixel_blend_max: 0.0
+
+sampling:
+  num_inference_steps: 20
+  guidance_scale: 1.5
+
+control:
+  model: diffusers/controlnet-depth-sdxl-1.0
+  image: outputs/_anchors/led4-a-fall.png
+  scale: 0.65
+  guidance_start: 0.0
+  guidance_end: 0.6
+
+rife:
+  passes: 5
+  skip_boundary: 0
+  edge_crop: 8
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/nyc-billboard/led

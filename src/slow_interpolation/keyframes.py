@@ -303,12 +303,15 @@ def generate_keyframes(
             invert=motion_cfg.mask_invert,
         )
         print(f"[keyframes] motion dx={motion_cfg.dx} dy={motion_cfg.dy} per keyframe, "
+              f"hp_sigma={motion_cfg.hp_sigma} cyclic={motion_cfg.cyclic}, "
               f"mask covers {100 * float(motion_mask.mean()):.1f}% of the frame")
 
     def _move(img: Image.Image) -> Image.Image:
         if motion_mask is None:
             return img
-        return displace(img, motion_mask, motion_cfg.dx, motion_cfg.dy)
+        return displace(img, motion_mask, motion_cfg.dx, motion_cfg.dy,
+                        hp_sigma=motion_cfg.hp_sigma, cyclic=motion_cfg.cyclic,
+                        band_hi=motion_cfg.band_hi)
 
     def _ctrl_at(seg: int, t: float) -> Image.Image | None:
         """Control map for a frame at SLERP position `t` within segment `seg`.

@@ -532,6 +532,59 @@ symptoms follow from the one mistake.
    the walk inside the mask. It re-imposes a static spatial pattern every frame and is a
    second anchoring mechanism working against the motion.
 
+### Attempts 2 and 3 also failed, and together they identify the real obstacle
+
+**Attempt 2** (`led5_a_fall`, `led5_a_fall_soft`): advect only the high-frequency band,
+cyclically. The envelope fix WORKS and is verified on a synthetic fall: ten keyframes of
+advection moved the top edge from y=153 to y=1431 under attempt 1 and from y=153 to
+y=151 under attempt 2. But nothing moved: 99% of frames identical. A strength sweep down
+to 0.26 (5 real steps) made it *more* static, not less.
+
+**Why**: measured band survival between consecutive KEYFRAMES.
+
+| band | r between keyframes |
+|---|---|
+| finer than ~4 px | **0.05** |
+| finer than ~8 px | **0.15** |
+| ~8 to 24 px | 0.82 |
+| ~24 to 80 px | 0.99 |
+| ~80 to 240 px | 0.99 |
+
+**Everything finer than ~8 px is re-invented at every keyframe.** `hp_sigma: 6` advected
+exactly that band, i.e. the only part of the image the chain discards.
+
+**Attempt 3** (`led6_a_fall`): band-pass 10 to 80 px, chosen from the table above so the
+moving band both survives the round trip and excludes the silhouette. Keyframe-to-keyframe
+shift of the advected band: **+1 px against an intended +154**.
+
+### The obstacle, stated properly
+
+The model does not CARRY texture it is handed; it RE-DERIVES it. The low band (coarser
+than 80 px) is held static by design, and the mid band is largely a deterministic function
+of that low band plus the prompt plus the fixed control map, so the model reconstructs
+streaks in the place the underlying structure implies rather than where the displaced
+input put them. Lower strength does not help because the issue is not how much it
+repaints, it is that what it repaints is determined by something we are deliberately
+holding still.
+
+That is a real obstacle rather than a dial, and it should be treated as such before a
+fourth attempt. Untested routes, in the order they look most promising:
+
+1. **Animate the control map instead of the pixels.** Give the water region a moving
+   structure in the depth map itself, per keyframe, so the thing that DETERMINES the
+   texture moves rather than the texture. Needs per-keyframe maps, since `control.images`
+   currently cross-fades one map per PROMPT and a cross-fade is a dissolve, not a
+   translation.
+2. **Drop ControlNet inside the mask only**, so the water has nothing asserting where it
+   should be, while the rock stays pinned.
+3. **Advect the low band too, with the envelope enforced by the control map** rather than
+   by frequency. Attempt 1 failed at this because it edge-filled; cyclic wrap plus a lip
+   asserted in the map is a different experiment.
+4. Very low strength, 0.10 to 0.15, so the chain barely repaints at all. Cheap to try and
+   worth one run, but expect soft output.
+
+Spend on this thread so far: about $0.22 across five renders.
+
 ### Worth keeping regardless of how this resolves
 
 - **`skip_boundary` must be 0 for translation work.** It drops the invented frames
