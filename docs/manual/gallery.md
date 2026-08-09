@@ -1,5 +1,10 @@
 # Dataset-curation gallery (for agents)
 
+**Not the render gallery.** This page is `tools/gallery_server.py` over
+`datasets/<name>/`, where a student keeps or cuts LoRA training candidates. If
+you are showing finished MP4s or keyframe PNGs to the maintainer, you want
+[render-gallery.md](render-gallery.md) and `tools/gallery.py` instead.
+
 You are an AI agent helping a student build a LoRA dataset per the protocol in [dataset-curation.md](dataset-curation.md). The gallery is the only step you cannot run yourself: the student must visually walk every candidate image, remove off-topic content, and hand-crop borderlines. Your job is to stand the gallery up, brief the student, and process the JSON they hand back.
 
 This page documents:

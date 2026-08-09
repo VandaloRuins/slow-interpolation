@@ -97,6 +97,11 @@ deck-assets/
 # Built by tools/gallery.py from whatever is in outputs/. Regenerate, never commit.
 gallery.html
 
+# Review notes the maintainer types into the render gallery and exports back to
+# the repo root. Unreleased-work commentary, and on occasion a client or venue
+# name. This repo is public. See docs/manual/render-gallery.md.
+gallery-feedback.json
+
 # Maintainer-local MCP servers (Canva, for the deck). Not part of the pipeline;
 # a student cloning this repo should not be offered a Canva server.
 .mcp.json
