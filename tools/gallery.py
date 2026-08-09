@@ -178,6 +178,43 @@ def base_stem(stem: str) -> str:
     return stem.split("__", 1)[0]
 
 
+_GENERATED_AT: dict[str, tuple[float, bool]] = {}
+
+
+def generated_at(video: Path) -> tuple[float, bool]:
+    """When the render was GENERATED, not when its file last changed.
+
+    File mtime is the wrong sort key. `sync_outputs.py` pulls from the Modal
+    volume and every downloaded file gets an mtime of now, so a sync silently
+    re-orders the whole gallery and puts old renders on top of today's work.
+    That is not a display quirk: it makes the newest renders unfindable in a
+    290-card page, which is exactly how they get reported as missing.
+
+    The manifest's `started_at_utc` is the real generation time and survives
+    any number of re-downloads. Renders with no manifest (local runs, older
+    work) fall back to mtime and are labelled differently on the card, so a
+    wrong date is visible rather than silently mixed in with correct ones.
+
+    Returns (epoch_seconds, exact).
+    """
+    key = str(video)
+    if key in _GENERATED_AT:
+        return _GENERATED_AT[key]
+    result = (video.stat().st_mtime, False)
+    manifest = video.with_suffix("").with_suffix(".manifest.json")
+    if not manifest.exists():
+        manifest = video.with_name(video.stem + ".manifest.json")
+    if manifest.exists():
+        try:
+            ts = json.loads(manifest.read_text(encoding="utf-8")).get("started_at_utc")
+            if ts:
+                result = (datetime.fromisoformat(ts).timestamp(), True)
+        except Exception:
+            pass
+    _GENERATED_AT[key] = result
+    return result
+
+
 def metadata_for(video: Path, configs: dict[str, dict]) -> tuple[dict, dict]:
     """Return (config, run) where run holds manifest-only fields."""
     run: dict = {}
@@ -372,9 +409,20 @@ input[type=search]{flex:1 1 240px;min-width:200px;background:var(--panel);
 input[type=search]:focus-visible,button:focus-visible,summary:focus-visible{
   outline:2px solid var(--accent);outline-offset:2px}
 /* 59 tags filled 86% of a phone screen before any render was visible, so the
-   filter wall is now behind a toggle. Open by default on wide screens only. */
+   filter wall is behind a toggle. It is now CLOSED by default at every width:
+   at 74 tags it took five rows of a desktop screen too, so the page opened on
+   its own chrome instead of on the work. */
 .tagbar{display:none;gap:6px;flex-wrap:wrap;margin-top:10px}
 .tagbar.open{display:flex}
+/* The caret is what makes the button read as a disclosure control rather than
+   as one more filter chip sitting among the others. */
+.caret{display:inline-block;margin-left:7px;font-size:9px;line-height:1;
+  transition:transform .16s;transform:rotate(-90deg);opacity:.75}
+.chip[aria-pressed=true] .caret{transform:rotate(0deg)}
+/* Active-filter count. Collapsing must never hide that a filter is on, so the
+   button carries the count and turns accent when any tag is selected. */
+#togglefilters.filtered{color:var(--bg);background:var(--accent);
+  border-color:var(--accent)}
 .chip{background:var(--panel);border:1px solid var(--line);color:var(--muted);
   border-radius:999px;padding:7px 14px;font:inherit;font-size:12.5px;cursor:pointer;
   transition:.14s;white-space:nowrap}
@@ -527,7 +575,7 @@ for(const b of document.querySelectorAll('.chip[data-tag]')){
     const t=b.dataset.tag;
     if(active.has(t)){active.delete(t);b.setAttribute('aria-pressed','false');}
     else{active.add(t);b.setAttribute('aria-pressed','true');}
-    apply();
+    apply();filterBadge();
   });
 }
 // Only load video on demand; dozens of autoplaying loops would thrash the page.
@@ -594,17 +642,37 @@ function marks(){
 }
 for(const n of notes) n.addEventListener('input',marks);
 
-// Filters toggle. Default open on wide screens, closed on phones, remembered.
+// Filters toggle. Collapsed by default at EVERY width now: 74 tags took five
+// rows of a desktop screen, so the page opened on its own chrome. The choice is
+// still remembered per browser, so anyone who prefers it open keeps it open.
+//
+// The storage key is VERSIONED. Changing a default is invisible to every
+// browser that already stored the old preference, which is everyone who has
+// opened this page before, so without the bump the change ships to nobody who
+// would notice it. Bump it again if the default changes again.
 const bar=document.querySelector('.tagbar');
 const tf=document.getElementById('togglefilters');
-const wide=window.matchMedia('(min-width:641px)').matches;
-const saved=localStorage.getItem('si-filters-open');
+const fcount=document.getElementById('filtercount');
+const saved=localStorage.getItem('si-filters-open-v2');
 function setFilters(open){
   bar.classList.toggle('open',open);
   tf.setAttribute('aria-pressed',open?'true':'false');
-  localStorage.setItem('si-filters-open',open?'1':'0');
+  tf.setAttribute('aria-expanded',open?'true':'false');
+  localStorage.setItem('si-filters-open-v2',open?'1':'0');
 }
-setFilters(saved===null?wide:saved==='1');
+// Collapsing must not hide state: with the wall shut, this button is the only
+// thing left saying a filter is on. Show the active count, fall back to total.
+// NB: JS is a plain string, not an f-string, so nothing here may use Python
+// brace substitution. The total comes from the DOM for that reason.
+const nTags=document.querySelectorAll('.chip[data-tag]').length;
+function filterBadge(){
+  const n=active.size;
+  fcount.textContent=n?String(n):String(nTags);
+  tf.classList.toggle('filtered',n>0);
+  tf.title=n?(n+' filter'+(n===1?'':'s')+' active'):'Show tag filters';
+}
+setFilters(saved==='1');
+filterBadge();
 tf.addEventListener('click',()=>setFilters(!bar.classList.contains('open')));
 
 // "With notes": jump straight to what has been reviewed.
@@ -619,7 +687,7 @@ document.getElementById('clearall').addEventListener('click',()=>{
   active.clear(); notesOnly=false; search.value='';
   for(const b of document.querySelectorAll('.chip[data-tag]')) b.setAttribute('aria-pressed','false');
   nb.setAttribute('aria-pressed','false');
-  apply();
+  apply();filterBadge();
 });
 
 // Tapping the poster on a phone should not require hitting a small button.
@@ -642,7 +710,7 @@ def build(refresh: bool) -> int:
     feedback = load_feedback()
     videos = sorted(
         (p for p in OUTPUTS.rglob("*.mp4") if "_gallery" not in p.parts and "archive" not in p.parts),
-        key=lambda p: p.stat().st_mtime, reverse=True,
+        key=lambda p: generated_at(p)[0], reverse=True,
     )
 
     cards: list[str] = []
@@ -685,8 +753,9 @@ def build(refresh: bool) -> int:
             rows.append(("gpu", str(run["gpu"])))
         if run.get("cost_usd") is not None:
             rows.append(("cost", f"${run['cost_usd']}"))
-        mtime = datetime.fromtimestamp(video.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
-        rows.append(("rendered", mtime))
+        gen_ts, exact = generated_at(video)
+        stamp = datetime.fromtimestamp(gen_ts).strftime("%Y-%m-%d %H:%M")
+        rows.append(("generated" if exact else "file date (no manifest)", stamp))
 
         specs = "".join(
             f"<dt>{html.escape(k)}</dt><dd>{html.escape(str(v))}</dd>" for k, v in rows
@@ -844,12 +913,13 @@ def build(refresh: bool) -> int:
     <input type="search" id="q" placeholder="Search name or prompt...">
   </div>
   <div class="controls">
-    <button class="chip" id="togglefilters" aria-pressed="false">Filters<span class="n">{n_tags}</span></button>
+    <button class="chip" id="togglefilters" aria-pressed="false" aria-expanded="false"
+            aria-controls="tagbar">Filters<span class="n" id="filtercount">{n_tags}</span><span class="caret">&#9660;</span></button>
     <button class="chip" id="notesonly" aria-pressed="false">With notes<span class="n" id="notecount"></span></button>
     <button class="chip" id="clearall">Clear</button>
     <button class="chip" id="export">Save feedback</button>
   </div>
-  <div class="tagbar">{tagbar}</div>
+  <div class="tagbar" id="tagbar">{tagbar}</div>
 </header>
 <main>{''.join(cards)}<div class="empty" id="empty" style="display:none">Nothing matches those filters.</div></main>
 <footer>Built {built} by tools/gallery.py. Rebuild after new renders.</footer>
