@@ -26,12 +26,82 @@ import yaml
 
 @dataclass
 class ModelsConfig:
-    """HuggingFace model identifiers. Resolved by diffusers via the HF cache."""
+    """HuggingFace model identifiers. Resolved by diffusers via the HF cache.
+
+    Set `lightning_lora` to `null` in YAML to skip the Lightning fuse entirely
+    and run the undistilled base model. The trailing-timestep scheduler swap is
+    a Lightning requirement and is skipped with it.
+
+    `vae_kind` selects the autoencoder: `tiny` loads `vae` as an
+    `AutoencoderTiny` (TAESD, fast, ~1 GB saved, lossy) and `full` loads
+    `vae_full` as an `AutoencoderKL`. The chain decodes and re-encodes once per
+    keyframe, so TAESD's loss compounds across the render; `full` is the control
+    for that. The two are separate fields on purpose: the latent scaling factors
+    differ (TAESD 1.0, SDXL KL 0.13025) and each repo carries its own, so
+    pointing one class at the other's repo produces silent colour garbage rather
+    than an error.
+    """
 
     sdxl_base: str = "stabilityai/stable-diffusion-xl-base-1.0"
-    lightning_lora: str = "ByteDance/SDXL-Lightning"
+    lightning_lora: str | None = "ByteDance/SDXL-Lightning"
     lightning_weight_name: str = "sdxl_lightning_4step_lora.safetensors"
     vae: str = "madebyollin/taesdxl"
+    vae_full: str = "madebyollin/sdxl-vae-fp16-fix"
+    vae_kind: str = "tiny"
+
+
+@dataclass
+class SamplingConfig:
+    """Diffusion sampling dials.
+
+    Previously hardcoded as `generate_keyframes` defaults and unreachable from
+    YAML, which is why neither was ever swept. Note that diffusers img2img runs
+    `int(num_inference_steps * strength)` actual denoising steps, so the two
+    interact: `strength` sets how far back in the schedule each frame re-enters
+    (the amount of change) while `num_inference_steps` sets how finely that same
+    distance is traversed (the quality). At the shipped defaults of 4 steps and
+    a steady strength of 0.55, every keyframe gets 2 denoising steps.
+    """
+
+    guidance_scale: float = 1.5
+    num_inference_steps: int = 4
+
+
+@dataclass
+class ControlConfig:
+    """SDXL ControlNet structural conditioning.
+
+    The anchor at warmup seeds composition once and its influence decays; a
+    pixel-space blend back toward it fights the model and smears the surface
+    (both measured, 2026-08-08). ControlNet instead injects residuals into the
+    UNet at EVERY denoising step of EVERY frame, so structure is part of what
+    the model paints rather than something applied to the result.
+
+    `image` is a fixed control map used on every frame, which pins composition
+    for the whole clip while light and surface keep drifting. That is the
+    palette-drift-on-stable-composition case the denoise schedule was tuned for.
+
+    `guidance_end` is the important dial, not `scale`: at ~0.5 the structure is
+    applied over the first half of each frame's denoising and the model is then
+    free to paint, which is the mitigation for the traced-geometry look that
+    high anchor strengths produced.
+
+    Depth rather than canny on purpose: canny prints hard edges that read as
+    line art under paint.
+    """
+
+    model: str = "diffusers/controlnet-depth-sdxl-1.0"
+    image: Path | None = None
+    # One map per PROMPT, cross-faded on the same t as the embedding SLERP. A
+    # single fixed map forces one geometry on every stage, which is why a
+    # wilderness stage came back with a city in it. With a list, stage 1 can be
+    # empty shoreline and stage 3 a dense modern skyline, while shared elements
+    # (the crag, Liberty's island) stay at identical coordinates in every map
+    # and therefore persist across the whole cycle.
+    images: list[Path] | None = None
+    scale: float = 0.55
+    guidance_start: float = 0.0
+    guidance_end: float = 0.5
 
 
 @dataclass
@@ -53,6 +123,28 @@ class StyleConfig:
     suffix: str = ""
     negative_prompt: str = ""
     lora_filename: str | None = None
+
+    # Per-segment LoRA strength, one entry per segment. When set, the style LoRA
+    # is kept as a LIVE adapter instead of being fused, and the scale is passed
+    # per call, so it can vary through the chain.
+    #
+    # Why: the LoRA is an asset on content it was trained on and a liability on
+    # content it has never seen. Measured on v8, stages III (modern city) and IV
+    # (burning city) have the softest keyframes and the highest per-frame change
+    # of the five, because with no learned representation the model reconsiders
+    # every frame rather than refining. SDXL base, meanwhile, knows a modern
+    # skyline perfectly well. So drop the LoRA only where it hurts and let the
+    # base model draw, with painterliness coming from the prompt instead.
+    #
+    # This works because the city is DISTANT and HAZY. Prompt-level painterliness
+    # is generic close up but adequate for a mass at the horizon, while the
+    # foreground crag, shore and sky keep the LoRA at full strength.
+    lora_scale_per_segment: list[float] | None = None
+
+    def scale_at(self, seg: int) -> float:
+        if self.lora_scale_per_segment and seg < len(self.lora_scale_per_segment):
+            return self.lora_scale_per_segment[seg]
+        return self.lora_scale
 
 
 @dataclass
@@ -93,6 +185,23 @@ class FrameCounts:
     transition: int = 3
     return_: int = 4
     warmup: int = 3
+
+    # Per-segment overrides, one entry per segment (len(prompts) - 1). A single
+    # global `steady` means every stage gets equal screen time, so a narrative
+    # cycle cannot linger on its climax. These let it: e.g. [10, 12, 26, 14, 10]
+    # spends more than twice as long on segment 2 as on segment 0. None = uniform.
+    steady_per_segment: list[int] | None = None
+    transition_per_segment: list[int] | None = None
+
+    def steady_at(self, seg: int) -> int:
+        if self.steady_per_segment and seg < len(self.steady_per_segment):
+            return self.steady_per_segment[seg]
+        return self.steady
+
+    def transition_at(self, seg: int) -> int:
+        if self.transition_per_segment and seg < len(self.transition_per_segment):
+            return self.transition_per_segment[seg]
+        return self.transition
 
 
 @dataclass
@@ -138,6 +247,20 @@ class RenderProfile:
     # Pre-frame Gaussian blur radius applied to the prior frame before
     # re-encoding. Prevents fine-texture runaway. 0 disables (calm mode).
     structural_decay_radius: int = 2
+
+    # Per-frame pixel blend back toward the post-warmup anchor, applied to EVERY
+    # steady and transition frame rather than only the return segment.
+    #
+    # `anchor_image` seeds composition once, at the warmup, and its influence
+    # then decays as the walk proceeds: the landmark appears in the first second
+    # and morphs away (measured, 2026-08-08). This holds it. The target is the
+    # post-warmup frame, not the raw source image, because that frame is the
+    # structure already rendered in the LoRA's hand; blending toward the flat
+    # source sketch would inject grey geometry instead.
+    #
+    # Small values only. This competes directly with the drift, so 0.25+ starts
+    # freezing the piece into a still. 0 keeps the old behaviour exactly.
+    anchor_reassert: float = 0.0
 
     # Frequency-separated temporal smoother.
     smoothing_sigma: float = 1.5
@@ -214,12 +337,24 @@ class PipelineConfig:
     render: RenderProfile = field(default_factory=RenderProfile.standard)
     frames: FrameCounts = field(default_factory=FrameCounts)
     resolution: ResolutionConfig = field(default_factory=ResolutionConfig)
+    sampling: SamplingConfig = field(default_factory=SamplingConfig)
+    control: ControlConfig | None = None
     rife: RIFEConfig = field(default_factory=RIFEConfig)
     encoding: EncodingConfig = field(default_factory=EncodingConfig)
     borders: BorderSuppressionConfig = field(default_factory=BorderSuppressionConfig)
     models: ModelsConfig = field(default_factory=ModelsConfig)
     output_dir: Path = field(default_factory=lambda: Path("outputs"))
     output_name: str | None = None  # defaults to subject.name at render time
+
+    # Structural seed. The warmup normally starts from pure random pixels at
+    # strength 0.85, which is text2img in disguise: the model composes from the
+    # prompt alone, so composition always comes from the LoRA's prior. Point
+    # `anchor_image` at a real photograph or a massing sketch and the whole
+    # chain inherits that geometry instead, while the LoRA supplies the surface.
+    # `anchor_strength` is the FIRST warmup pass only; lower keeps more of the
+    # source structure. 0.85 (the noise default) keeps almost none.
+    anchor_image: Path | None = None
+    anchor_strength: float = 0.65
 
 
 # ---------------------------------------------------------------------------
@@ -302,6 +437,14 @@ def load_pipeline_config(path: str | Path) -> PipelineConfig:
     resolution = (
         ResolutionConfig(**raw["resolution"]) if "resolution" in raw else ResolutionConfig()
     )
+    sampling = SamplingConfig(**raw["sampling"]) if "sampling" in raw else SamplingConfig()
+    control = None
+    if raw.get("control"):
+        cd = dict(raw["control"])
+        _coerce_paths(cd, ["image"])
+        if cd.get("images"):
+            cd["images"] = [Path(p).expanduser() for p in cd["images"]]
+        control = ControlConfig(**cd)
     rife = _build_rife(raw.get("rife"))
     encoding = EncodingConfig(**raw["encoding"]) if "encoding" in raw else EncodingConfig()
     borders = _build_borders(raw.get("borders"))
@@ -309,6 +452,9 @@ def load_pipeline_config(path: str | Path) -> PipelineConfig:
 
     output_dir = Path(raw.get("output_dir", "outputs")).expanduser()
     output_name = raw.get("output_name")
+    anchor_raw = raw.get("anchor_image")
+    anchor_image = Path(anchor_raw).expanduser() if anchor_raw else None
+    anchor_strength = float(raw.get("anchor_strength", 0.65))
 
     return PipelineConfig(
         style=style,
@@ -316,10 +462,14 @@ def load_pipeline_config(path: str | Path) -> PipelineConfig:
         render=render,
         frames=frames,
         resolution=resolution,
+        sampling=sampling,
+        control=control,
         rife=rife,
         encoding=encoding,
         borders=borders,
         models=models,
         output_dir=output_dir,
         output_name=output_name,
+        anchor_image=anchor_image,
+        anchor_strength=anchor_strength,
     )

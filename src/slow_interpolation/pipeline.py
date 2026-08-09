@@ -74,6 +74,8 @@ class Pipeline:
             self.config,
             output_dir=kf_dir,
             noise_walker=self._noise_walker,
+            guidance_scale=self.config.sampling.guidance_scale,
+            num_inference_steps=self.config.sampling.num_inference_steps,
         )
 
         unload_sdxl_pipeline(self._sdxl)

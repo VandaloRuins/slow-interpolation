@@ -33,31 +33,59 @@ from .prompts import encode_prompt, slerp_embeddings
 def load_sdxl_pipeline(config: PipelineConfig) -> Any:
     """Load and configure the SDXL Lightning img2img pipeline + style LoRA."""
     from diffusers import (
+        AutoencoderKL,
         AutoencoderTiny,
+        ControlNetModel,
         EulerDiscreteScheduler,
+        StableDiffusionXLControlNetImg2ImgPipeline,
         StableDiffusionXLImg2ImgPipeline,
     )
 
     m = config.models
+    ctrl = config.control
 
-    pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
-        m.sdxl_base,
-        torch_dtype=torch.float16,
-        variant="fp16",
-    ).to("cuda")
+    if ctrl is not None:
+        # Same img2img chain, plus a fixed control map injected at every
+        # denoising step. The Lightning and style LoRAs still fuse into the
+        # UNet below; ControlNet is a separate network on the residuals, so
+        # they compose rather than conflict.
+        controlnet = ControlNetModel.from_pretrained(
+            ctrl.model, torch_dtype=torch.float16, variant="fp16"
+        )
+        pipe = StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
+            m.sdxl_base,
+            controlnet=controlnet,
+            torch_dtype=torch.float16,
+            variant="fp16",
+        ).to("cuda")
+        print(f"[keyframes] ControlNet {ctrl.model} scale={ctrl.scale} "
+              f"guidance {ctrl.guidance_start}-{ctrl.guidance_end}")
+    else:
+        pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+            m.sdxl_base,
+            torch_dtype=torch.float16,
+            variant="fp16",
+        ).to("cuda")
 
-    # Lightning 4-step LoRA: fuse and unload. Scheduler must use trailing timesteps.
-    pipe.load_lora_weights(m.lightning_lora, weight_name=m.lightning_weight_name)
-    pipe.fuse_lora()
-    pipe.unload_lora_weights()
+    # Lightning LoRA: fuse and unload. Scheduler must use trailing timesteps.
+    # `lightning_lora: null` skips both, running the undistilled base model,
+    # which wants many more steps at a normal guidance scale.
+    if m.lightning_lora:
+        pipe.load_lora_weights(m.lightning_lora, weight_name=m.lightning_weight_name)
+        pipe.fuse_lora()
+        pipe.unload_lora_weights()
 
-    pipe.scheduler = EulerDiscreteScheduler.from_config(
-        pipe.scheduler.config, timestep_spacing="trailing"
-    )
+        pipe.scheduler = EulerDiscreteScheduler.from_config(
+            pipe.scheduler.config, timestep_spacing="trailing"
+        )
 
-    # TAESD VAE: fast, fp16-stable, ~1 GB saved vs full SDXL VAE.
-    taesd = AutoencoderTiny.from_pretrained(m.vae, torch_dtype=torch.float16).to("cuda")
-    pipe.vae = taesd
+    # TAESD VAE: fast, fp16-stable, ~1 GB saved vs full SDXL VAE, at the cost of
+    # a lossy encode/decode round trip once per keyframe. `vae_kind: full`
+    # swaps in AutoencoderKL to measure what that costs across a chain.
+    if m.vae_kind == "full":
+        pipe.vae = AutoencoderKL.from_pretrained(m.vae_full, torch_dtype=torch.float16).to("cuda")
+    else:
+        pipe.vae = AutoencoderTiny.from_pretrained(m.vae, torch_dtype=torch.float16).to("cuda")
     pipe.safety_checker = None
     pipe.unet.to(memory_format=torch.channels_last)
     torch.cuda.empty_cache()
@@ -68,7 +96,11 @@ def load_sdxl_pipeline(config: PipelineConfig) -> Any:
     if style.lora_path:
         resolved = _resolve_lora_path(style.lora_path, style.lora_filename)
         if resolved is not None:
-            _load_style_lora(pipe, resolved, style.lora_scale)
+            live = style.lora_scale_per_segment is not None
+            _load_style_lora(pipe, resolved, style.lora_scale, keep_live=live)
+            if live:
+                print(f"[keyframes] style LoRA kept LIVE, per-segment scales "
+                      f"{style.lora_scale_per_segment}")
             torch.cuda.empty_cache()
 
     return pipe
@@ -102,7 +134,8 @@ def _resolve_lora_path(lora_path: Path | str, lora_filename: str | None) -> str 
     return None
 
 
-def _load_style_lora(pipe: Any, lora_path: str, lora_scale: float) -> None:
+def _load_style_lora(pipe: Any, lora_path: str, lora_scale: float,
+                     keep_live: bool = False) -> None:
     """Load a style LoRA, with a UNet-only fallback for Kohya-format LoRAs.
 
     diffusers 0.31+ has a regression converting Kohya-format SDXL text-encoder
@@ -120,6 +153,12 @@ def _load_style_lora(pipe: Any, lora_path: str, lora_scale: float) -> None:
         state_dict = load_file(lora_path)
         unet_only = {k: v for k, v in state_dict.items() if not k.startswith("lora_te")}
         pipe.load_lora_weights(unet_only)
+    if keep_live:
+        # Do NOT fuse: fusing bakes one scale into the weights for the whole
+        # render. Left live, the scale can be passed per call via
+        # cross_attention_kwargs and therefore vary per stage.
+        pipe.set_adapters(pipe.get_active_adapters() or ["default_0"], [lora_scale])
+        return
     pipe.fuse_lora(lora_scale=lora_scale)
     pipe.unload_lora_weights()
 
@@ -219,14 +258,60 @@ def generate_keyframes(
     current_img = _random_noise_image(res.width, res.height)
     frame_idx = 0
 
+    # Control map loaded once; it is FIXED across every frame, which is what
+    # pins the composition for the whole clip.
+    ctrl = config.control
+    ctrl_maps: list[Image.Image] = []
+    if ctrl is not None:
+        srcs = list(ctrl.images) if ctrl.images else ([ctrl.image] if ctrl.image else [])
+        ctrl_maps = [
+            Image.open(s).convert("RGB").resize((res.width, res.height), Image.LANCZOS)
+            for s in srcs
+        ]
+        if ctrl_maps:
+            print(f"[keyframes] {len(ctrl_maps)} control map(s), "
+                  f"{'cross-faded per stage' if len(ctrl_maps) > 1 else 'fixed'}")
+
+    def _ctrl_at(seg: int, t: float) -> Image.Image | None:
+        """Control map for a frame at SLERP position `t` within segment `seg`.
+
+        With one map, always that map. With a list, cross-fade between map[seg]
+        and map[seg+1] on the same `t` the prompt embeddings use, so structure
+        and text change together instead of fighting.
+        """
+        if not ctrl_maps:
+            return None
+        if len(ctrl_maps) == 1:
+            return ctrl_maps[0]
+        a = ctrl_maps[min(seg, len(ctrl_maps) - 1)]
+        b = ctrl_maps[min(seg + 1, len(ctrl_maps) - 1)]
+        if t <= 0.0:
+            return a
+        if t >= 1.0:
+            return b
+        return Image.blend(a, b, t)
+
     def _pipe_call(
         image: Image.Image,
         embeds: torch.Tensor,
         pooled: torch.Tensor,
         cfg_kw: dict[str, Any],
         strength: float,
+        ctrl_img: Image.Image | None = None,
+        lora_scale: float | None = None,
     ) -> Image.Image:
+        ctrl_kw: dict[str, Any] = {}
+        if lora_scale is not None:
+            ctrl_kw["cross_attention_kwargs"] = {"scale": lora_scale}
+        if ctrl is not None and ctrl_img is not None:
+            ctrl_kw = {
+                "control_image": ctrl_img,
+                "controlnet_conditioning_scale": ctrl.scale,
+                "control_guidance_start": ctrl.guidance_start,
+                "control_guidance_end": ctrl.guidance_end,
+            }
         result = pipe(
+            **ctrl_kw,
             prompt_embeds=embeds,
             pooled_prompt_embeds=pooled,
             **cfg_kw,
@@ -242,13 +327,27 @@ def generate_keyframes(
         ).images[0]
         return result
 
-    # --- Warmup: establish from noise ---
+    # --- Warmup: establish from noise, or from a structural anchor ---
     embeds_cur, pooled_cur, _, _ = all_embeds[0]
     cfg_kw = _cfg_kwargs(0)
+    anchor_src = getattr(config, "anchor_image", None)
+    if anchor_src is not None:
+        # Seeded: the first pass runs at anchor_strength (default 0.65) so the
+        # source geometry survives instead of being replaced by noise.
+        current_img = Image.open(anchor_src).convert("RGB").resize(
+            (res.width, res.height), Image.LANCZOS
+        )
+        first_strength = config.anchor_strength
+        print(f"[keyframes] seeded from {anchor_src} at strength {first_strength}")
+    else:
+        # `current_img` is already the random-noise canvas from above; leave it.
+        first_strength = 0.85
     for wi in range(frames.warmup):
-        strength = 0.85 if wi == 0 else 0.75
+        strength = first_strength if wi == 0 else 0.75
         input_img = noise_walker.blend(current_img, blend_pct=render.steady_noise_blend)
-        current_img = _pipe_call(input_img, embeds_cur, pooled_cur, cfg_kw, strength)
+        current_img = _pipe_call(input_img, embeds_cur, pooled_cur, cfg_kw, strength,
+                                 _ctrl_at(0, 0.0),
+                                 style.scale_at(0) if style.lora_scale_per_segment else None)
 
     # Anchor = first coherent post-warmup frame. Used by the return segment
     # for pixel-space convergence and saved as the final keyframe for loop
@@ -263,18 +362,23 @@ def generate_keyframes(
         cfg_kw = _cfg_kwargs(seg_idx)
 
         # Steady frames.
-        for fi in range(frames.steady):
+        for fi in range(frames.steady_at(seg_idx)):
             strength = render.steady_strengths[fi % len(render.steady_strengths)]
+            base = _pixel_blend_toward_anchor(
+                current_img, anchor_img, render.anchor_reassert
+            )
             input_img = noise_walker.blend(
-                _structural_decay(current_img, render.structural_decay_radius),
+                _structural_decay(base, render.structural_decay_radius),
                 blend_pct=render.steady_noise_blend,
             )
-            current_img = _pipe_call(input_img, embeds_cur, pooled_cur, cfg_kw, strength)
+            current_img = _pipe_call(input_img, embeds_cur, pooled_cur, cfg_kw, strength,
+                                     _ctrl_at(seg_idx, 0.0),
+                                     style.scale_at(seg_idx) if style.lora_scale_per_segment else None)
             current_img.save(output_dir / f"{frame_idx:04d}.png")
             frame_idx += 1
 
         # Transition or return.
-        actual_n = frames.return_ if is_return else frames.transition
+        actual_n = frames.return_ if is_return else frames.transition_at(seg_idx)
         for ti in range(actual_n):
             t_linear = (ti + 1) / (actual_n + 1)
             t = 3 * t_linear**2 - 2 * t_linear**3  # smoothstep
@@ -292,11 +396,18 @@ def generate_keyframes(
             else:
                 strength = render.transition_strength
 
+            # The return segment already blends toward the anchor on its own
+            # ramp; do not double-apply there.
+            base = current_img if is_return else _pixel_blend_toward_anchor(
+                current_img, anchor_img, render.anchor_reassert
+            )
             input_img = noise_walker.blend(
-                _structural_decay(current_img, render.structural_decay_radius),
+                _structural_decay(base, render.structural_decay_radius),
                 blend_pct=render.transition_noise_blend,
             )
-            current_img = _pipe_call(input_img, blended_embeds, blended_pooled, cfg_kw, strength)
+            current_img = _pipe_call(input_img, blended_embeds, blended_pooled, cfg_kw,
+                                     strength, _ctrl_at(seg_idx, t),
+                                     style.scale_at(seg_idx) if style.lora_scale_per_segment else None)
             current_img.save(output_dir / f"{frame_idx:04d}.png")
             frame_idx += 1
 
@@ -316,4 +427,10 @@ def expected_keyframe_count(config: PipelineConfig) -> int:
     """
     f = config.frames
     n_segments = len(config.subject.prompts) - 1
-    return n_segments * f.steady + (n_segments - 1) * f.transition + f.return_ + 1
+    # Per-segment aware: a cycle that lingers on one stage must still report the
+    # right count, because this feeds conform.py's frame-floor check.
+    total = 0
+    for seg in range(n_segments):
+        total += f.steady_at(seg)
+        total += f.return_ if seg == n_segments - 1 else f.transition_at(seg)
+    return total + 1

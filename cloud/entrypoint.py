@@ -86,6 +86,7 @@ def main(
     )
 
     preserve_staging = bool(modal_section.get("preserve_staging", False))
+    skip_keyframes = bool(modal_section.get("skip_keyframes", False))
 
     # Forward any non-standard `modal:` fields as manifest notes.
     extra_notes: list[str] = []
@@ -118,6 +119,7 @@ def main(
         git_dirty=git_dirty,
         notes=extra_notes,
         preserve_staging=preserve_staging,
+        skip_keyframes=skip_keyframes,
     )
 
     print()

@@ -118,11 +118,13 @@ image = (
         local_path=str(_REPO_ROOT / "cloud"),
         remote_path="/root/slow-interpolation/cloud",
     )
-    # examples/configs is small and useful to have on the container
-    # for sanity-check renders.
+    # examples/configs is small (~170 KB) and useful to have on the container
+    # for sanity-check renders. Mount ONLY it: `examples/` as a whole is 109 MB,
+    # of which `examples/outputs/` is 101 MB of sample MP4s the container never
+    # reads, and the client hash-walks the whole tree on every dispatch.
     .add_local_dir(
-        local_path=str(_REPO_ROOT / "examples"),
-        remote_path="/root/slow-interpolation/examples",
+        local_path=str(_REPO_ROOT / "examples" / "configs"),
+        remote_path="/root/slow-interpolation/examples/configs",
     )
 )
 
@@ -166,6 +168,7 @@ def _render_impl(
     git_dirty: bool = False,
     notes: list[str] | None = None,
     preserve_staging: bool = False,
+    skip_keyframes: bool = False,
 ) -> dict[str, Any]:
     """Render one config end-to-end on a Modal GPU.
 
@@ -200,8 +203,24 @@ def _render_impl(
     # Run phases with per-phase timing.
     phase_times: list[PhaseTime] = []
 
+    # Phase A is skippable so keyframes can be authored OUTSIDE this pipeline
+    # (a stronger model, a real photograph, a hand edit) and this run does only
+    # smoothing plus interpolation. Mirrors `run.py --skip-keyframes`. The
+    # keyframes must already be on the outputs volume at
+    # `staging/<output_name>/keyframes/` before dispatch.
     tA = time.perf_counter()
-    pipeline.generate_keyframes()
+    if skip_keyframes:
+        kf_dir = pipeline.keyframes_dir
+        existing = sorted(kf_dir.glob("*.png")) if kf_dir.exists() else []
+        if len(existing) < 2:
+            raise FileNotFoundError(
+                f"skip_keyframes was requested but {kf_dir} holds "
+                f"{len(existing)} PNG(s). Upload keyframes to the outputs "
+                f"volume at staging/{pipeline.output_name}/keyframes/ first."
+            )
+        notes.append(f"phase A skipped, reused {len(existing)} staged keyframes")
+    else:
+        pipeline.generate_keyframes()
     phase_times.append(PhaseTime("A", time.perf_counter() - tA))
 
     tS = time.perf_counter()

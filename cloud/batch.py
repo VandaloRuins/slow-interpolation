@@ -46,7 +46,8 @@ from .app import (
 from .manifest import resolve_git_commit
 
 
-KNOWN_MODAL_KEYS = {"gpu", "pipeline_entry", "config_loader", "notes", "preserve_staging"}
+KNOWN_MODAL_KEYS = {"gpu", "pipeline_entry", "config_loader", "notes",
+                    "preserve_staging", "skip_keyframes"}
 
 
 @app.local_entrypoint()
@@ -98,6 +99,7 @@ def main(
                     or DEFAULT_CONFIG_LOADER
                 ),
                 "preserve_staging": bool(modal_section.get("preserve_staging", False)),
+                "skip_keyframes": bool(modal_section.get("skip_keyframes", False)),
             }
         )
 
@@ -106,7 +108,10 @@ def main(
     for e in entries:
         print(f"  - {e['label']}  gpu={e['gpu_tier']}  entry={e['pipeline_entry']}")
 
-    # Group by (gpu_tier, pipeline_entry, config_loader, preserve_staging).
+    # Group by (gpu_tier, pipeline_entry, config_loader, preserve_staging,
+    # skip_keyframes). Every one of these lands in the shared kwargs dict
+    # that Function.map broadcasts, so any of them differing must split
+    # the batch into separate .map() calls (SDK quirk #9).
     # Each group becomes one .map() call (Modal's map can only share one
     # kwargs dict across the batch).
     groups: dict[tuple[str, str, str, bool], list[dict[str, Any]]] = {}
@@ -116,6 +121,7 @@ def main(
             e["pipeline_entry"],
             e["config_loader"],
             e["preserve_staging"],
+            e["skip_keyframes"],
         )
         groups.setdefault(key, []).append(e)
 
@@ -127,7 +133,7 @@ def main(
     t0 = time.perf_counter()
     results: list[tuple[str, dict[str, Any] | Exception]] = []
 
-    for (gpu_tier, p_entry, c_loader, preserve_staging), group in groups.items():
+    for (gpu_tier, p_entry, c_loader, preserve_staging, skip_keyframes), group in groups.items():
         fn = resolve_render_fn(gpu_tier)
         labels = [e["label"] for e in group]
         yaml_texts = [e["yaml_text"] for e in group]
@@ -141,6 +147,7 @@ def main(
             "git_dirty": git_dirty,
             "notes": [f"BATCH RUN (group gpu={gpu_tier})"],
             "preserve_staging": preserve_staging,
+            "skip_keyframes": skip_keyframes,
         }
 
         try:
