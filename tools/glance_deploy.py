@@ -81,6 +81,9 @@ def main() -> int:
     ap.add_argument("--project", default="slow-interpolation-glance",
                     help="Vercel project name, used only on the FIRST deploy; after "
                          "that the saved link decides, so the URL stays put")
+    ap.add_argument("--curate", action="store_true",
+                    help="inject the tier-0 curation face (select tiles, export a "
+                         "removal list for glance_export --exclude-file)")
     ap.add_argument("--pin", choices=["main", "ledwall"], default="main",
                     help="which Vercel project pin to use; ledwall is the curated field")
     ap.add_argument("--deploy", action="store_true", help="actually run vercel")
@@ -116,6 +119,21 @@ def main() -> int:
     if r.returncode != 0:
         print(f"viewer install failed:\n{r.stdout}\n{r.stderr}", file=sys.stderr)
         return 1
+
+    # 1b) tier-0 curation face. Lives in THIS repo, not in the white-label
+    # payload: the white-label manifest excludes every write-layer file by
+    # design, so this must ride alongside, not upstream.
+    if args.curate:
+        src = ROOT / "tools" / "glance_curate.js"
+        shutil.copy2(src, out / "glance" / "curate-static.js")
+        idx = out / "index.html"
+        html_text = idx.read_text(encoding="utf-8")
+        needle = '<script type="module" src="glance/glance.js"></script>'
+        assert needle in html_text, "index.html changed shape; curation not injected"
+        extra = chr(10) + '  <script type="module" src="glance/curate-static.js"></script>'
+        html_text = html_text.replace(needle, needle + extra, 1)
+        idx.write_text(html_text, encoding="utf-8")
+        print("  curation face injected (tier-0 select + export removals)")
 
     # 2) the archive
     for sub in ("data", "atlas", "thumbs"):
@@ -157,13 +175,20 @@ def main() -> int:
     (out / "data" / "catalogue.json").write_text(json.dumps(cat, ensure_ascii=False),
                                                  encoding="utf-8")
 
-    # 5) hosting config. Content-keyed assets are immutable; the JSON is not.
+    # 5) hosting config. Immutable is reserved for CONTENT-KEYED names only:
+    # thumbs/<sha16>.jpg changes name when the content changes, so it may be
+    # cached forever. atlas-index.json, sheet-0.jpg and media/<key>.mp4 keep
+    # their names across rebuilds; marking those immutable froze a browser on
+    # the 49-tile atlas after the field grew to 103, and no reload short of a
+    # hard refresh could fix it, because browsers never revalidate immutable.
     (out / "vercel.json").write_text(json.dumps({
         "cleanUrls": True,
         "headers": [
-            {"source": "/(atlas|thumbs|media)/(.*)",
+            {"source": "/thumbs/(.*)",
              "headers": [{"key": "Cache-Control",
                           "value": "public, max-age=31536000, immutable"}]},
+            {"source": "/(atlas|media)/(.*)",
+             "headers": [{"key": "Cache-Control", "value": "public, max-age=60"}]},
             {"source": "/data/(.*)",
              "headers": [{"key": "Cache-Control", "value": "public, max-age=60"}]},
         ],

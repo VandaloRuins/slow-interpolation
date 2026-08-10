@@ -89,8 +89,31 @@ def run_of(rel: Path) -> tuple[str, str]:
     return slug(parts[-1]), slug(parts[0])
 
 
+def generated_ts(f: Path) -> float:
+    """When a render was GENERATED. Manifest first: file mtime is rewritten by
+    every volume sync, so a date window on mtime would sweep in years-old work
+    that happened to be re-downloaded this week."""
+    man = f.with_suffix("").with_suffix(".manifest.json")
+    if not man.is_file():
+        man = f.with_name(f.stem + ".manifest.json")
+    if man.is_file():
+        try:
+            import json as _json
+            from datetime import datetime as _dt
+            ts = _json.loads(man.read_text(encoding="utf-8")).get("started_at_utc")
+            if ts:
+                return _dt.fromisoformat(ts).timestamp()
+        except Exception:
+            pass
+    return f.stat().st_mtime
+
+
 def collect(include_frames: bool, limit: int | None,
-            include: list[str] | None = None):
+            include: list[str] | None = None,
+            since_days: float | None = None,
+            exclude_keys: set[str] | None = None):
+    import time as _time
+    cutoff = (_time.time() - since_days * 86400) if since_days else None
     items = []
     for f in sorted(OUTPUTS.rglob("*")):
         if not f.is_file():
@@ -108,6 +131,10 @@ def collect(include_frames: bool, limit: int | None,
             continue
         is_frame = "keyframes" in rel.parts or "frames" in rel.parts
         if is_frame and not include_frames:
+            continue
+        if cutoff and generated_ts(f) < cutoff:
+            continue
+        if exclude_keys and rel.as_posix() in exclude_keys:
             continue
         items.append((f, rel, ext in VID_EXT, is_frame))
         if limit and len(items) >= limit:
@@ -139,6 +166,14 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--collection", default="slow-interpolation")
     ap.add_argument("--rebuild-thumbs", action="store_true")
+    ap.add_argument("--since-days", type=float, default=None,
+                    help="only assets GENERATED in the last N days. Cloud renders "
+                         "date from their manifest's started_at_utc; anything "
+                         "else falls back to file mtime, which syncs rewrite, so "
+                         "manifests win whenever present.")
+    ap.add_argument("--exclude-file", type=Path, default=None,
+                    help="removal list exported by the curated field's tier-0 "
+                         "curate face; assets whose key matches are dropped")
     ap.add_argument("--include", action="append", default=None,
                     help="only assets whose outputs/-relative path starts with this; "
                          "repeatable. The curated-exhibition switch.")
@@ -154,7 +189,14 @@ def main() -> int:
     if not OUTPUTS.is_dir():
         sys.exit(f"no outputs/ at {OUTPUTS}")
 
-    items = collect(not args.no_frames, args.limit, args.include)
+    excl: set[str] = set()
+    if args.exclude_file:
+        import json as _json
+        doc = _json.loads(Path(args.exclude_file).read_text(encoding="utf-8"))
+        excl = {e["key"] for e in doc.get("exclude", []) if e.get("key")}
+        print(f"excluding {len(excl)} curated-out asset(s)")
+    items = collect(not args.no_frames, args.limit, args.include,
+                    since_days=args.since_days, exclude_keys=excl)
     if not items:
         sys.exit("nothing to export")
 
