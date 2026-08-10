@@ -1,0 +1,116 @@
+# LED wall, screen C. 1728 x 540, 16:5, 10.000 s, 30 fps.  FOURTH PASS.
+#
+# THE LIGHT ARC TEST, screen C half. Same single change as led12_b_savage and
+# the same reasoning; read that file's header for the full argument. In one
+# line: led3 pinned the composition and held it perfectly, but at steady 1 the
+# chain got only two ~0.45 steps to cross from starless night to full
+# moonlight, so the arc never arrived. This gives it four steps at ~0.59 and
+# changes nothing else. Map, prompts, negative, seed, RIFE scheme all
+# byte-identical to led3_c_desolation.
+#
+# C is the harder half of the pair and it is worth saying why before judging
+# it. B travels between two lights that are both bright somewhere in the frame,
+# so there is always signal for the chain to work on. C travels between two
+# near-black states, and its negative prompt bans every warm escape route
+# (golden hour, sunset, warm light, daylight, fire). If the arc reads on C it
+# reads anywhere. If it reads on B and not on C, the answer is not "light
+# cannot be the subject", it is "light cannot be the subject in the dark", and
+# the fix is a brighter B pole (moonrise with a lit cloud edge rather than
+# moonlight on water) rather than more strength.
+#
+#     python tools/conform.py --screen bc --crop-y 288 --src <render>.mp4
+
+seed: 1087
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome, golden hour, sunset, warm light, daylight, fire, foliage"
+
+subject:
+  name: led12_c_desolation
+  # Byte-identical to led3_c_desolation. 47 and 48 tokens against a 62 target.
+  prompts:
+    - label: "A: starless black night, faint cold light"
+      prompt: >-
+        starless black night, faint cold light, a tall rocky crag on a shore in
+        the foreground, still black water, broken ruined columns on a low shore
+        far across the water
+    - label: "B: full moonlight, silver on the water"
+      prompt: >-
+        full moonlight, silver on the water, a tall rocky crag on a shore in the
+        foreground, still black water, broken ruined columns on a low shore far
+        across the water
+    - label: "A (return)"
+      prompt: >-
+        starless black night, faint cold light, a tall rocky crag on a shore in
+        the foreground, still black water, broken ruined columns on a low shore
+        far across the water
+
+resolution:
+  width: 1536
+  height: 896
+
+# 3 prompts -> 2 segments. K = (2+1) + (2+2) + 1 = 8 keyframes.
+# raw = K * (2^6 - 1 - 2*4) - 1 = 8 * 55 - 1 = 439, retimed to 300 (1.46x).
+frames:
+  steady: 2
+  transition: 1
+  return_: 2
+  warmup: 3
+
+render:
+  structural_decay_radius: 1
+  # Only [0] and [1] are read at steady 2. At 20 steps: 11 and 12 real steps.
+  steady_strengths: [0.58, 0.60, 0.58, 0.60, 0.58, 0.60, 0.58, 0.60]
+  transition_strength: 0.62
+  return_strength_start: 0.58
+  return_strength_end: 0.50
+  return_pixel_blend_max: 0.45
+
+sampling:
+  num_inference_steps: 20
+  guidance_scale: 1.5
+
+control:
+  model: diffusers/controlnet-depth-sdxl-1.0
+  image: outputs/_anchors/led2-c-desolation.png
+  scale: 0.65
+  guidance_start: 0.0
+  guidance_end: 0.6
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 8
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/nyc-billboard/led

@@ -1,0 +1,158 @@
+# LED wall, screen B. 1728 x 540, 16:5, 10.000 s, 30 fps.  FOURTH PASS.
+#
+# THE LIGHT ARC TEST. led3 settled the pipeline question: a fixed control map
+# pins the composition for the whole clip and the picture holds, which it did
+# perfectly. What it did NOT do is travel. Black storm to brilliant sun never
+# arrived, and the reason is arithmetic rather than aesthetic: at steady 1 the
+# chain gets exactly TWO steps to cross from the A light to the B light (the
+# transition frame at the 50/50 embedding, then the single B steady frame), and
+# each step was ~0.45, i.e. 8 real denoising steps out of 20. One img2img edit
+# at 0.45 does not take a black storm to gold water, so the clip reached maybe
+# a fifth of the way and turned around.
+#
+# So this render changes ONLY the travel dials, and changes nothing else at
+# all. Both control maps, every prompt string, the negative, the map scale,
+# the RIFE scheme and the seed are byte-identical to led3. If the arc still
+# will not move, the fault is the prompt pair and not the schedule, which is
+# the next test and is cheap.
+#
+# WHAT MOVED, and the reasoning per dial:
+#
+#   steady 1 -> 2.  Three steps to the peak instead of two, plus a fourth to
+#   settle INTO it rather than passing through. K goes 6 -> 8.
+#
+#   strengths 0.44/0.46 -> 0.58/0.60.  12 real steps at 20 rather than 8.
+#   Note that `steady_strengths` is indexed by position WITHIN a segment, so at
+#   steady 2 only the first two entries are ever read and both segments get the
+#   same pair. The list is written flat on purpose; the old per-frame jitter has
+#   no room to operate at this K and pretending otherwise would be misleading.
+#
+#   transition 0.45 -> 0.62.  The transition frame is the one carrying a 50/50
+#   SLERP of the two lights, so it is where the largest push belongs.
+#
+#   return 0.44->0.40 becomes 0.58->0.50.  Coming back from full sun to black
+#   storm is the same size of change as going out; led3 gave the return less
+#   authority than the forward path, which is backwards.
+#
+#   return_pixel_blend_max 0.35 -> 0.45.  At return_ 2 the smoothstep puts the
+#   last return keyframe at t=0.741 toward the A-return prompt, so it still
+#   carries about a quarter of the B light in its conditioning, and the frame
+#   appended after it is the pure-A warmup anchor. led3's loop closed easily
+#   because its light barely moved. A real arc stresses exactly that seam, and
+#   the pixel blend toward the anchor is the mechanism built for it.
+#
+# DRIFT BUDGET. 8 keyframes x ~0.59 = 4.7, against the 4.5 that L21 landed on
+# and the banked files' 7 x 0.55 = 3.85. It sits at L21's target but spends it
+# on 8 map-pinned keyframes rather than 15 unpinned ones, which is the whole
+# reason a budget this size is affordable now.
+#
+# PACING. raw = 8 * (2^6 - 1 - 2*4) - 1 = 439, retimed to 300 (1.46x). The
+# velocity throb is K/10 = 0.8 Hz, up from led3's 0.6 but well under the 1.5 Hz
+# that made the second pass unwatchable. `skip_boundary` stays at 4: dropping
+# to passes 5 lands under conform's 300 floor at any boundary, and raising the
+# boundary to 8 buys a flatter sharpness curve at the cost of the worst
+# stepping measured all week.
+#
+# FREE SEED CHECK. Warmup is untouched (3 passes, same prompt, same map, same
+# seed), so this render's appended anchor keyframe must come out byte-identical
+# to led3_b_savage's 0005.png. That closes the open "did the seed take"
+# question from the 2026-08-09 pause at zero extra spend.
+#
+#     python tools/conform.py --screen bc --crop-y 288 --src <render>.mp4
+
+seed: 1087
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome, buildings, towers, city"
+
+subject:
+  name: led12_b_savage
+  # Byte-identical to led3_b_savage. Subject clause identical across all three
+  # prompts; only the light phrase moves. 49 and 50 tokens on the two SDXL
+  # tokenizers against a 62 target.
+  prompts:
+    - label: "A: black storm light, heavy rain cloud, dark water"
+      prompt: >-
+        black storm light, heavy rain cloud, dark water, a great rocky crag on a
+        shore in the foreground, a wide bay, a long low wooded shore far across
+        the water
+    - label: "B: brilliant sunlight breaking through the storm, gold on the water"
+      prompt: >-
+        brilliant sunlight breaking through the storm, gold on the water, a
+        great rocky crag on a shore in the foreground, a wide bay, a long low
+        wooded shore far across the water
+    - label: "A (return)"
+      prompt: >-
+        black storm light, heavy rain cloud, dark water, a great rocky crag on a
+        shore in the foreground, a wide bay, a long low wooded shore far across
+        the water
+
+resolution:
+  width: 1536
+  height: 896
+
+# 3 prompts -> 2 segments. K = (2+1) + (2+2) + 1 = 8 keyframes.
+# raw = K * (2^6 - 1 - 2*4) - 1 = 8 * 55 - 1 = 439, retimed to 300 (1.46x).
+frames:
+  steady: 2
+  transition: 1
+  return_: 2
+  warmup: 3
+
+render:
+  structural_decay_radius: 1
+  # Only [0] and [1] are read at steady 2. At 20 steps: 11 and 12 real steps.
+  steady_strengths: [0.58, 0.60, 0.58, 0.60, 0.58, 0.60, 0.58, 0.60]
+  transition_strength: 0.62
+  return_strength_start: 0.58
+  return_strength_end: 0.50
+  return_pixel_blend_max: 0.45
+
+sampling:
+  num_inference_steps: 20
+  guidance_scale: 1.5
+
+control:
+  model: diffusers/controlnet-depth-sdxl-1.0
+  image: outputs/_anchors/led2-b-savage.png
+  scale: 0.65
+  guidance_start: 0.0
+  guidance_end: 0.6
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 8
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/nyc-billboard/led
