@@ -153,16 +153,32 @@ def main() -> int:
     # payload: the white-label manifest excludes every write-layer file by
     # design, so this must ride alongside, not upstream.
     if args.curate:
-        src = ROOT / "tools" / "glance_curate.js"
-        shutil.copy2(src, out / "glance" / "curate-static.js")
+        shutil.copy2(ROOT / "tools" / "glance_curate.js",
+                     out / "glance" / "curate-static.js")
+        shutil.copy2(ROOT / "tools" / "glance_curate_hide.js",
+                     out / "glance" / "curate-hide.js")
         idx = out / "index.html"
         html_text = idx.read_text(encoding="utf-8")
+
+        # The hide shim must run BEFORE glance.js, which calls boot() at module
+        # evaluation and so starts fetching the catalogue immediately. Modules are
+        # deferred and classic scripts run during parsing, so this goes in as a
+        # CLASSIC tag after glance.config.js (which it needs for `collection`) and
+        # necessarily ahead of every module. A patch installed from
+        # curate-static.js would always be too late.
+        cfg_needle = '<script src="glance/glance.config.js"></script>'
+        assert cfg_needle in html_text, "index.html changed shape; hide shim not injected"
+        html_text = html_text.replace(
+            cfg_needle,
+            cfg_needle + chr(10) + '  <script src="glance/curate-hide.js"></script>',
+            1)
+
         needle = '<script type="module" src="glance/glance.js"></script>'
         assert needle in html_text, "index.html changed shape; curation not injected"
         extra = chr(10) + '  <script type="module" src="glance/curate-static.js"></script>'
         html_text = html_text.replace(needle, needle + extra, 1)
         idx.write_text(html_text, encoding="utf-8")
-        print("  curation face injected (tier-0 select + export removals)")
+        print("  curation face injected (tier-0 select, local remove, export removals)")
 
     # 2) the archive. `atlas` lands under its stamped name (step 0).
     for sub in ("data", "thumbs"):
