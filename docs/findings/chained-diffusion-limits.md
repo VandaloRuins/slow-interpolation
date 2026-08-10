@@ -11,15 +11,19 @@ and [denoise-step-budget.md](denoise-step-budget.md).
 ## The headline
 
 **The pipeline is stable on content the LoRA was trained on and unstable on content
-it was not, and no parameter fixes that.** Measured across ten renders: stages
-drawn from Cole's own repertoire (storm, pasture, ruins) hold their sharpness and
-gain detail across the chain; a modern city and a burning city lose it, every time,
-under every setting tried.
+it was not.** Measured across ten renders: stages drawn from Cole's own repertoire
+(storm, pasture, ruins) hold their sharpness and gain detail across the chain; a
+modern city and a burning city lose it, every time, under every setting tried.
 
-The decisive test was v10, which halved `lora_scale` on the city stages only, on the
-theory that the LoRA had no representation for them. **Instability changed by 0%**
-(per-frame change 1.234 to 1.235). SDXL base is exactly as unstable on a dense city
-as the Cole LoRA is. So the constraint is **content complexity**, not the LoRA.
+**Whether that is content complexity or the LoRA is UNTESTED as of 2026-08-09.**
+The v10 experiment that was recorded here as decisive turned out to be a no-op:
+`_pipe_call`'s ControlNet branch reassigned the kwargs dict and silently discarded
+`cross_attention_kwargs`, which is the only path `lora_scale_per_segment` has to the
+model, so every v10 frame ran at the base scale of 0.90 and nothing was ever halved.
+Its "instability changed by 0% (1.234 to 1.235)" is the signature of a no-op, not
+evidence about the LoRA. Fixed in `079598d`; the rerun against working code is queued
+(quality-first L16 has the full account). Until it lands, treat the LoRA-vs-content
+attribution as open.
 
 What DID work was reducing the number of elements: v9 simplified the skyline from
 twelve slender towers to five broad masses and scored `image 9/10`, the best of the
@@ -125,10 +129,15 @@ All backwards compatible, all default to previous behaviour.
 
 ## Open, unresolved
 
-**Stage III still blurs.** Ten renders in, the modern-city stage remains the weakest,
-and the evidence says it is inherent to complex content in a chained walk rather than
-a tuning failure. The untried routes are a LoRA trained on modern architecture in a
-painterly register, or accepting a non-modern peak.
+**Stage III still blurs.** Ten renders in, the modern-city stage remains the weakest.
+The untried routes are the rerun of the per-segment scale experiment (above), a LoRA
+trained on modern architecture in a painterly register, or accepting a non-modern peak.
+
+---
+*Change note 2026-08-10: the v10 "decisive test" paragraph was rewritten after the
+experiment was found to be a no-op (per-segment `lora_scale` never reached the model
+under ControlNet; fixed in `079598d`). The trained-vs-untrained observation and the v9
+fewer-larger-masses result are unaffected. See quality-first L16.*
 
 ---
 *Counter-findings welcome. See [CONTRIBUTING.md](../../CONTRIBUTING.md) shape 4.*
