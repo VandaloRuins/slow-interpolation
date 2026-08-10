@@ -25,6 +25,7 @@ present in the bundle, and stripped otherwise.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -106,11 +107,39 @@ def main() -> int:
         shutil.rmtree(out)
     out.mkdir(parents=True)
 
+    # 0) CONTENT-STAMP THE ATLAS DIRECTORY.
+    #
+    # The atlas is the one part of the bundle that is fetched by a FIXED name
+    # (`atlas-index.json`, `sheet-0.jpg`) yet changes on every rebuild, which
+    # makes it the single thing a browser can get permanently wrong. It did:
+    # marking `atlas/` immutable once froze visitors on a 49-tile atlas after
+    # the field had grown, and because immutable entries are NEVER revalidated,
+    # no ordinary reload recovers -- only clearing site data. Confirmed again on
+    # 2026-08-10 from a phone still showing 49 of 117 assets, in a clustered
+    # layout that had collapsed because glance.js silently skips any field asset
+    # missing from the atlas (`const t = tiles[a.sha]; if (!t) continue;`), so a
+    # stale atlas drops most of the field AND wrecks the clustering at once.
+    #
+    # Serving the atlas from `atlas-<hash>/` makes the NAME follow the CONTENT,
+    # which is the only durable fix: a stale cache entry is orphaned rather than
+    # consulted, and a browser that already holds a bad atlas repairs itself on
+    # the next load with nothing asked of the user. It needs no viewer change --
+    # `atlasBase` is a runtime config field and glance.js resolves both atlas
+    # fetches through it. It also makes `immutable` CORRECT for the atlas rather
+    # than dangerous, since the name now changes whenever the bytes do.
+    src_atlas = args.export / "atlas"
+    h = hashlib.sha256()
+    for f in sorted(src_atlas.rglob("*")):
+        if f.is_file():
+            h.update(f.name.encode("utf-8"))
+            h.update(f.read_bytes())
+    atlas_dir = f"atlas-{h.hexdigest()[:10]}"
+
     # 1) the viewer, configured for a static tier 0 deploy
     cfg = out.parent / "_glance-deploy.config.json"
     cfg.write_text(json.dumps({
         "title": args.title, "collection": args.collection, "tier": 0,
-        "dataBase": "data", "atlasBase": "atlas", "thumbBase": "thumbs",
+        "dataBase": "data", "atlasBase": atlas_dir, "thumbBase": "thumbs",
         "apiBase": "", "auth": None, "profileHello": False,
     }), encoding="utf-8")
     r = subprocess.run([sys.executable, str(installer), "--target", str(out),
@@ -135,9 +164,10 @@ def main() -> int:
         idx.write_text(html_text, encoding="utf-8")
         print("  curation face injected (tier-0 select + export removals)")
 
-    # 2) the archive
-    for sub in ("data", "atlas", "thumbs"):
+    # 2) the archive. `atlas` lands under its stamped name (step 0).
+    for sub in ("data", "thumbs"):
         shutil.copytree(args.export / sub, out / sub, dirs_exist_ok=True)
+    shutil.copytree(src_atlas, out / atlas_dir, dirs_exist_ok=True)
 
     cat = json.loads((out / "data" / "catalogue.json").read_text(encoding="utf-8"))
     videos = [a for a in cat["assets"] if a.get("media_type") == "video"]
@@ -175,21 +205,30 @@ def main() -> int:
     (out / "data" / "catalogue.json").write_text(json.dumps(cat, ensure_ascii=False),
                                                  encoding="utf-8")
 
-    # 5) hosting config. Immutable is reserved for CONTENT-KEYED names only:
-    # thumbs/<sha16>.jpg changes name when the content changes, so it may be
-    # cached forever. atlas-index.json, sheet-0.jpg and media/<key>.mp4 keep
-    # their names across rebuilds; marking those immutable froze a browser on
-    # the 49-tile atlas after the field grew to 103, and no reload short of a
-    # hard refresh could fix it, because browsers never revalidate immutable.
+    # 5) hosting config. Immutable is reserved for CONTENT-KEYED names only.
+    # `thumbs/<sha16>.jpg` and now `atlas-<hash>/*` both change name when their
+    # bytes change, so they may be cached forever. Everything whose name is
+    # STABLE across rebuilds must stay short-lived:
+    #   - data/*        the catalogue and field are rewritten every build
+    #   - media/*       proxy names are derived from the asset key
+    #   - glance/*      including glance.config.js, which names the atlas dir.
+    #                   This one is load-bearing: a cached config pointing at a
+    #                   retired atlas-<hash>/ would 404 the whole field, which
+    #                   would be a worse failure than the stale atlas it fixes.
     (out / "vercel.json").write_text(json.dumps({
         "cleanUrls": True,
         "headers": [
             {"source": "/thumbs/(.*)",
              "headers": [{"key": "Cache-Control",
                           "value": "public, max-age=31536000, immutable"}]},
-            {"source": "/(atlas|media)/(.*)",
+            {"source": "/atlas-(.*)",
+             "headers": [{"key": "Cache-Control",
+                          "value": "public, max-age=31536000, immutable"}]},
+            {"source": "/media/(.*)",
              "headers": [{"key": "Cache-Control", "value": "public, max-age=60"}]},
             {"source": "/data/(.*)",
+             "headers": [{"key": "Cache-Control", "value": "public, max-age=60"}]},
+            {"source": "/glance/(.*)",
              "headers": [{"key": "Cache-Control", "value": "public, max-age=60"}]},
         ],
     }, indent=2), encoding="utf-8")
