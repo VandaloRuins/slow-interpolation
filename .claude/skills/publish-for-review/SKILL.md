@@ -5,6 +5,12 @@ description: Publish renders to the browser gallery and, when asked, to a phone 
 
 # Publish for review
 
+**Not the Glance field gallery.** If the user means the shared Vercel link
+(https://glance-deploy.vercel.app) or "the whole outputs view", that is
+[glance-gallery](../glance-gallery/SKILL.md). This page is `gallery.html` plus the
+phone tunnel: one batch, reviewed closely.
+
+
 The whole point is that Luca sees the work. Every failure this guards against was
 **silent**: the command exited zero, the file looked right, and the page was wrong.
 So the rule underneath all of it is: **verify the way the user will experience it,
@@ -71,6 +77,19 @@ done
 
 Tell Luca plainly that a quick tunnel is **public and unauthenticated**, and that it
 carries unreleased work.
+
+
+**Every card a capped deploy meets must point at a proxy.** An 18 MB conformed
+deliverable sat under the old 25 MB proxy threshold, its card pointed at the full file,
+the Vercel slice dropped that file for size, and the card 404ed on click -- on exactly
+the cards being reviewed. Threshold is now 12 MB; `deploy_gallery.py` exempts playback
+targets (`data-src`, `<img src`) from its size cap and refuses to build if one is
+missing. The gallery also excludes `outputs/_deploy` and `outputs/_glance*` from
+indexing, or it makes duplicate cards of the deploy bundles themselves.
+
+**Rebuilds are seconds, not minutes.** `ffprobe -count_frames` decodes every frame;
+results are cached on (size, mtime_ns) in `outputs/_gallery/probe-cache.json`. A warm
+rebuild of 330+ renders is ~1.4 s. Never revert to uncached probing.
 
 ## If you change the gallery's JavaScript, open it in a browser
 

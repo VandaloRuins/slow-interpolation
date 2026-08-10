@@ -77,3 +77,36 @@ conditioning strength fixes it. Simplify the content instead.
 
 Verify by looking at the map before rendering. A map that reads wrong to you reads wrong
 to the model.
+
+## Value distribution is load-bearing (2026-08-09, measured)
+
+The maps that work measure **~56 to 66% black, ~21% above 200**. The delivery-aspect
+maps that failed kept the black fraction but pushed the near field to 48 to 54%, and
+both renders painted an enormous foreground wall with the horizon shoved out of frame.
+A depth map half at maximum brightness says "a wall in front of the camera". Check
+`mean / black% / near%` against a known-good map before spending.
+
+## The border, four ways to smear
+
+The corner artefact lives in the KEYFRAMES (Phase A), not RIFE, and it appears whenever
+the map asks the border to be featureless or false. All four of these failed in one day:
+smooth ramps to the edge; a flat grey ring; a black ring cutting through solid rock
+(semantic nonsense paints as mud); a tall UNIFORM bright column at the edge (repetitive
+fill collapses into smear). The only borders that render clean carry **varied or
+semantically continuous content running to the frame edge**, like a bay map's shelf.
+Also: screen A's conform crop keeps the central 506 px, so judge delivered corners from
+the conformed file, never the raw card.
+
+## No straight lines where the LoRA expects a frame
+
+A RECTANGLE at the bottom of the canvas was painted by the Cole LoRA as a gilded picture
+frame standing in the pool. Structural assertion beats the negative prompt every time it
+has been tested. Spray, shores, basins: overlapping irregular billows, never a rectangle.
+
+## Per-keyframe maps exist, and what they cannot do
+
+`control.keyframe_images` cycles one map per KEYFRAME (index, not prompt), for structure
+that must change through the clip; author phase i/K so map K equals map 0 and the loop
+closes in the conditioning. Built for motion, where it still failed (see
+`motion-compositing`), but it is the right tool for per-keyframe structural evolution
+generally. `images` remains a per-PROMPT cross-fade, and a cross-fade is a dissolve.
