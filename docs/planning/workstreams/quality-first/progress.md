@@ -644,6 +644,105 @@ is acceptable for the billboard, or the compositing route gets built, is Luca's 
   is the one place it is correct.
 - The gorge depth map and the 1:3 framing both read well. Only the motion is unresolved.
 
+## Session 2026-08-10: the light arc measured, and the seed question closed
+
+Screens B and C. All figures below are taken on the **delivered crop**
+(rows 288 to 762 of the 880-row render), never the full frame, because the sky
+above row 288 never reaches the wall.
+
+### L22. Light CAN be the subject, and the cost is now a number rather than an argument
+
+led12 = led3 with `steady` 1 to 2, strengths 0.44/0.46 to 0.58/0.60, transition
+0.45 to 0.62, return given the forward path's authority, `return_pixel_blend_max`
+0.35 to 0.45. Map, prompts, negative, seed and RIFE scheme byte-identical, so the
+result attributes to the schedule.
+
+| | B storm to sun | C night to moon |
+|---|---|---|
+| luminance swing, led3 to led12 | 5.72 to **8.77** | 7.39 to **10.09** |
+| contrast ratio | 1.08x to **1.14x** | 1.15x to **1.25x** |
+| structural r, trough to peak | 0.965 to **0.911** | 0.894 to **0.672** |
+| loop delta | 0.12 to 0.72 | 0.10 to 0.54 |
+
+**led3's arc was spatially FLAT** (per-band swings 6.7 / 5.2 / 5.4 on B), which is
+an exposure change, not a light event. led12's is 12.1 / 6.8 / 7.7: the break in
+the cloud now brightens more than the water beneath it. That qualitative shift is
+invisible in the global number.
+
+**Both poles darkened.** B's min fell 70.6 to 63.1 and its **max also fell**, 76.3
+to 71.9. A prediction that the growth would be upward was refuted. More authority
+per keyframe let the model finally assert "black storm light"; the sun pole still
+does not arrive.
+
+**The diagnostic that names the cheap fix: the peak lands at 62% of the loop,
+which is the first RETURN keyframe.** The light is still climbing when the chain
+is told to turn around, so the arc is step-limited at the B pole, not
+strength-limited. Strength is the expensive lever and is what bought the
+stability loss.
+
+**led13, dispatched:** four renders isolating the two dials. `steady_per_segment
+[1, 3]` reallocates the budget to the B pole at identical K=8, identical 439 raw
+frames and identical 0.8 Hz throb, crossed with strengths held (0.58/0.60) versus
+lowered (0.52/0.54). led12 moved keyframe count and strength together, which the
+coupled-dial rule forbids; this separates them. C's pair also adds `people,
+figures, a standing figure` to the negative, constant across both so the strength
+comparison is unaffected.
+
+**Defect found in led12_c:** an unprompted standing figure on the foreground ledge
+at the peak. C's negative banned warm light and foliage but never people. Same
+defect class as the objects in screen A's pool.
+
+### L23. The seed took, but renders are NOT bit-reproducible, so a hash is the wrong instrument
+
+L21's open question is answered. led12's warmup anchor against led3's, same
+warmup, same map, same seed 1087:
+
+| | B | C |
+|---|---|---|
+| pearson r | **0.979** | **0.948** |
+| mean abs diff | 5.58 / 255 | 5.95 / 255 |
+| pixels byte-identical | 0.2% | 0.2% |
+
+r ~0.98 rules out an unseeded canvas, which would give a different painting. But
+0.2% identical rules out determinism. Consistent with GPU kernel
+nondeterminism amplified through the ~47 sequential denoising steps of warmup.
+The L16 `cross_attention_kwargs` fix is inert for these configs, since
+`lora_scale` stays `None` unless `lora_scale_per_segment` is set, so it is not the
+cause.
+
+**Consequence:** verify reproducibility by correlation, never by checksum. The
+definitive run-to-run check (re-run one config unchanged, ~$0.04) is still not run.
+
+### L24. How to measure a light arc
+
+- For a light-drift clip the **global luminance IS the subject**, so a frame
+  average is the right instrument here. This is the exception to
+  `chained-diffusion-limits.md`'s "frame-average metrics lie", which is about
+  sharpness.
+- Measure it on the **delivered crop**, per band. "Gold on the water" is a claim
+  about a region, and a general lift versus a directional light read identically
+  in the global number.
+- Structural stability is best read as pearson r on a low-passed (sigma 12) frame
+  pair, trough against peak: it reports composition rather than texture.
+- Script currently in the session scratchpad. Promote to `tools/` if a third
+  session needs it; two uses is not yet a tool.
+
+### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
+
+- **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,
+  because the viewer's `exitSelectMode()` runs `selection.clear()`, and `done` was
+  the only button that looked like a commit. Relabelled, marks now persist to
+  `localStorage` and restore via `selectShas()`, export states plainly that the
+  tiles remain until the rebuild. Verified in Playwright against a local build of
+  the assembled site. Landed `a26fbd705`. **The production redeploy is still
+  pending** and the removal round trip was proven end to end (107 to 104 assets,
+  exactly the exported keys). No row exists in the workstream registry for
+  `tools/glance_*`, so this defaults to the parent tracker.
+- **`modal-sdk-quirks.md` quirk 7b**: the Windows codepage crash on `modal run`
+  creates a zombie ephemeral app with 0 tasks, renders nothing, spends nothing,
+  and can exit 0 through a pipe. Fix is a per-command `env PYTHONIOENCODING=utf-8`
+  prefix, because Bash-tool shell state does not persist.
+
 ## Session 2026-08-09: delivery-aspect authoring, and two code faults it exposed
 
 Paused mid-session at Luca's request. **Read L16 before trusting L-anything about

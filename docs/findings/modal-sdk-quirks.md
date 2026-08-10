@@ -1,6 +1,8 @@
 # Modal SDK quirks discovered while building cloud/
 
-Date: 2026-05-18 (initial), updated 2026-05-19 (quirk #11 added).
+Date: 2026-05-18 (initial), updated 2026-05-19 (quirk #11), 2026-08-07
+(quirk #12), 2026-08-10 (quirk #7b: the same codepage crash on `modal run`
+is a silent no-op that can exit 0).
 Modal SDK version: **1.4.2** (`pip install modal>=0.66` resolves here as of
 the build date).
 Scope: load-bearing behaviours of the Modal Python SDK that took multiple
@@ -227,6 +229,42 @@ don't take effect.
 becomes muscle memory.
 
 **Captured in**: [`../modal.md`](../modal.md) Windows note section.
+
+#### 7b. The same crash on `modal run` costs you a SILENT no-op, and can exit 0
+
+Found 2026-08-10 dispatching a two-render batch. Worse than 7's failed
+upload, because nothing tells you it failed.
+
+Modal prints `✓ Initialized.` **after** creating the ephemeral app and
+**before** dispatching any function call. So when that print raises:
+
+- the app exists server-side, in state `ephemeral`, with **0 tasks**
+- no container ever starts, so **nothing renders and nothing is spent**
+- `tools/modal_status.py` reports `RUNNING: 1 app(s) still live`, which
+  reads as work in progress rather than as a corpse
+- and if you piped the command (`modal run ... | tail`), **the shell exit
+  code is the pipe's, so you see 0**. An exit code is not a result.
+
+The tell is `modal app list`: an `ephemeral` app with 0 tasks and no
+matching output on the volume.
+
+**Fix, per command, not per shell.** The Bash tool starts a fresh
+environment each call and shell state does not persist, so quirk 7's
+"set it once per shell" is unavailable there. Prefix the command
+instead, with `env` so the line still begins with a real command:
+
+```bash
+env PYTHONIOENCODING=utf-8 PYTHONUTF8=1 modal run -m cloud.batch --configs "a.yaml,b.yaml"
+```
+
+**Cleaning up the zombie**: `modal app stop <app-id> --yes`. Without
+`--yes` it prompts and aborts, and piping `yes |` into it does not help:
+it detects the non-interactive terminal and demands the flag.
+
+**Discovery cost**: one dispatch believed to be running, then a zombie
+app to reap. Cheap only because the app had 0 tasks; the same crash
+during a long batch would strand the client while the remote work
+continued.
 
 ### 8. Modal's `Volume.batch_upload(force=True)` requires module-mode invocation context
 
