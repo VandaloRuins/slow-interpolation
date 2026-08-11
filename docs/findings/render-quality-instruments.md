@@ -117,6 +117,40 @@ frames Gemini flagged as soft the luminance sits at the median (1.01x and 1.00x)
 focus is 0.64x and 0.76x. The softness is real and independent of the light. Re-run this
 check on any subject whose arc is much larger.
 
+## The warm-up ramp: intrinsic to the base chain, three fixes tried and refuted
+
+Found by measuring the KEYFRAMES rather than the video, on `led20_base_s35`. The first
+three keyframes score 3.2 / 3.4 / 10.6 against 34.1 at keyframe 7, a **4.16x ramp**, and
+both blur flags Gemini confirmed sit inside it. The folded mid-pair pulse is only 16%, so
+the interpolator is innocent, and the light arc is ruled out separately (r = -0.658).
+
+**Lightning and base run opposite trajectories through the chain.** Lightning starts sharp
+and decays (2.60 to 0.41 by keyframe 6); base starts soft and builds. This is a
+base-specific fault.
+
+| attempt | ramp | kf_ssim | what actually happened |
+|---|---|---|---|
+| `led20_base_s35` control | 4.16x | 0.882 | keyframe 7 peaks at 34.1 |
+| `steady_noise_blend` 0.08 to 0.03 | 3.34x | 0.868 | **10x SOFTER mid-chain** (kf5 18.6 to 1.7) |
+| front-loaded strengths | 3.32x | 0.872 | held sharpness, **broke the loop**, Gemini 9 to 6 |
+| `warmup` 3 to 8 | **2.02x** | **0.893** | flattest ramp, but the CEILING collapsed 34.1 to 10.5 |
+
+**Every one of the three flattened the ratio by lowering the whole curve.** None raised the
+opening. Read the absolute keyframe values, never the ramp ratio alone: two of these three
+would look like wins on the ratio and both are regressions.
+
+**Mechanism, and it is the useful part.** In the base chain, detail is ACCUMULATED by the
+img2img walk itself, and **the noise walk supplies the raw material it accumulates from**.
+That is why cutting `steady_noise_blend` made things worse rather than cleaner: the noise
+is not a contaminant the model has to clean, it is the high-frequency stock the model
+organises into brushwork. And it is why warmup cannot pre-bake the detail: eight strong
+passes converge the canvas to something smooth that the chain then has less to build from.
+
+**The consequence for the loop.** The clip runs soft to sharp and then wraps, joining the
+sharpest keyframe to the softest, which is a sharpness step at the wrap. The untried route
+is not another dial: render extra lead-in keyframes and DISCARD them, so only the resolved
+part of the chain ships.
+
 ## What no instrument here can see
 
 Record these rather than re-deriving them.
