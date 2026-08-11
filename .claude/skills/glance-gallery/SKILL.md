@@ -155,6 +155,16 @@ At 3.2 (16:5) a tile spans two neighbours and at 0.33 (1:3) it is a sliver. `con
 each tile inside its cell preserving aspect, the same rule review mode already uses. It is
 a viewer config field defaulting to `overlap`, so no other project's field changes.
 
+**`contain` also switches the camera padding, and that is what actually made the
+verticals legible.** `layoutBounds` pads a fixed 1.5 world units, which is a thin margin
+against a thousand tiles and most of the frame against twenty: the 21-piece field
+rendered in about a third of the viewport and a 1:3 vertical came out ~35 px wide on a
+phone. The viewer already had the fix, `pad by half a cell instead`, but gated to review
+mode. It now applies to any `contain` field. Tiles roughly doubled and the field fills
+the width. Note the two orientations then measure 0.27 (vertical) against 0.25
+(horizontal) world units squared, i.e. verticals are slightly LARGER in area; if they
+still read as weaker it is the 1:3 crop being narrow, not a sizing bug.
+
 **Delivery files have no proxy, and that once shipped a link of dead posters.**
 `gallery.py` only builds previews for the raw renders it indexes, so a spec-only field was
 **0 of 12 playable** on Vercel while the tunnel showed 12. `glance_deploy.py` now falls
