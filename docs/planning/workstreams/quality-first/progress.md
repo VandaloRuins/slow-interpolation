@@ -727,6 +727,67 @@ definitive run-to-run check (re-run one config unchanged, ~$0.04) is still not r
 - Script currently in the session scratchpad. Promote to `tools/` if a third
   session needs it; two uses is not yet a tool.
 
+### L25. There is NO prompt-side suppression lever at `guidance_scale: 1.5`
+
+led12_c painted an unprompted standing figure. led13_c added `people, figures, a standing
+figure` to the negative and the figure SURVIVED, merely changing posture. So led14 ran a
+discriminating pair, because two different causes predict the same surviving figure.
+
+| render | change from `led13_c_realloc_soft` | figure | mean L | HF energy |
+|---|---|---|---|---|
+| control | -- | present | 53.9 | 100% |
+| `led14_c_cfg3` | `guidance_scale` 1.5 to 3.0 | **GONE** | 42.8 | **155%** |
+| `led14_c_pospeople` | `no people` in the POSITIVE prompt | present | 53.7 | 103% |
+
+**Negatives are weight-starved, not ignored.** Give the negative branch weight and it bites
+immediately, with nothing else changed. But you cannot do it selectively: raising guidance
+activates the WHOLE negative list at once, and C's bans golden hour, warm light, daylight
+and fire, which is where the 25% darkening comes from. It also came out **harder and
+crisper, not flatter** (155% of control's contrast-normalised FFT high-frequency energy),
+which is the documented trap where a sharpness gain reads worse.
+
+**The positive route is a null result and it refutes a standing precedent.** `led11_a_fall`
+puts "no people" in the POSITIVE prompt and that has never been verified. Here it did
+nothing measurable: identical to control on every axis, and the figure got more prominent.
+
+So at 1.5 there is no prompt-side lever in either direction, and the repo's elaborate
+negatives (picture frame, watermark, sepia, brown monochrome) are largely decoration. The
+remaining lever is structural: a control map that gives the element no room. That is
+priorities row PL12 and it is the next render.
+
+### PENDING DECISION for Luca, one word, nothing is blocked on it
+
+**`docs/tutorial-first-runs.md` teaches negatives as an active control, at exactly the
+guidance where L25 measured them inert.** Its own config sets `guidance_scale: 1.5` (line
+84, also the code default), line 91 hands the student a 16-term negative including
+`angel, wings, halo, saint, religious, crucifix, biblical, cherub`, and line 215 tells them
+to TUNE it per-LoRA ("drop the religious-bias suppressions, keep the generic anti-noise
+terms"), which implies a granularity that does not exist at 1.5.
+
+The harm is a false cause: a student credits their negative for the absence of angels, when
+the work is being done by the style prefix, the LoRA and the subject clause. Later, when
+something unwanted does appear, they add negative terms, nothing happens, and they have no
+model of why.
+
+`/kb-sync` FLAGGED this on 2026-08-10 and deliberately wrote nothing, because rewriting
+teaching material on one render pair would overstate the evidence. **Approved text, to
+APPEND (not to replace their guidance), on Luca's yes:**
+
+> **Measured caution, 2026-08-10.** At `guidance_scale: 1.5` (the value above, and the code
+> default) classifier-free guidance gives the negative branch almost no weight, and a
+> negative term measured close to inert: a figure that a `people, figures, a standing figure`
+> ban failed to remove vanished immediately at guidance 3.0 with nothing else changed, and
+> putting the suppression in the positive prompt did nothing either. Treat this negative as
+> inherited convention, not an active control. What keeps unwanted content out here is the
+> style prefix, the LoRA and the subject clause. Evidence is one render pair on the Cole
+> LED-wall configs (`led14_c_cfg3` against `led14_c_pospeople`, L25 above), so read it as
+> "measured here, expect it to hold" rather than proven across every subject.
+
+Do NOT tell the student to delete the negative: that has not been measured.
+Same open question applies to `docs/manual/train-lora-on-modal.md:114` ("aggressive negatives
+fight stylistic LoRAs"), which may be unaffected if validation runs at a different guidance.
+Check the guidance there before touching it.
+
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 
 - **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,
