@@ -951,6 +951,89 @@ carries a +-20% floor and is not comparable between clips of different frame cou
 - The standing figure is absent from `led17_c_dense`, but as a side effect of a different
   trajectory, not controlled suppression. It is NOT evidence for PL12.
 
+### L29. The publish gate, and what building it revealed about the instruments
+
+Standing rule from Luca, 2026-08-11: every output is analysed with the Gemini
+multimodal video tool AND with frame analysis at the frames Gemini flags, and a clip
+with blur, non-smooth interpolation or border artefacts does NOT reach the gallery.
+Implemented as [`tools/review_gate.py`](../../../../tools/review_gate.py).
+
+Three things had to be learned the hard way while building it, all worth keeping.
+
+**1. Gemini is noisy and a single sample cannot be gated on.** Same clip, same
+prompt, three runs: loop 7/9/7, motion 6/7/6, flag count 8/3/6. An earlier verdict
+of 9/9/8/9 was a lucky draw that did not reproduce. The gate now takes the MEDIAN of
+three runs and keeps a flag only if a MAJORITY of runs report that kind within 1.5 s.
+On one clip that dropped 15 of 15 flags as unsupported. Treat any single Gemini score
+as +-2 on loop and +-1 elsewhere.
+
+**2. The canvas edge is invisible to BOTH instruments, and stayed invisible.** Gemini
+raised no border flag on renders that carry an obvious 55px smear band, because it
+watches a downscaled clip and the band is 3% of the width. Four band statistics were
+then tried against a hand-verified set of four dirty and four clean clips, and all
+four overlapped:
+
+| discriminator | dirty | clean |
+|---|---|---|
+| HF energy, band vs interior | 1.17 to 3.06 | 1.01 to 1.44 |
+| streak direction, bin-count corrected | 0.07 to 0.23 | 0.11 to 1.57 |
+| strongest vertical edge near the border | 1.45 to 2.53 | 1.27 to 2.49 |
+| local tile detail, band vs interior | 0.68 to 1.05 | 0.69 to 1.35 |
+
+One of those failed for an instructive reason: a 64px band has 33 x-frequency bins
+and a 1344px interior has 673, so any SUM over a frequency bucket measures the crop
+width rather than the content. Using the mean per bin fixes that particular bug but
+still does not separate. **So the gate writes native-resolution edge strips and they
+get LOOKED AT.** Do not replace that with a threshold without re-validating.
+
+**3. Rubbery morphing is the dominant defect and no metric here can see it.** It is
+local warping at constant global velocity, so every frame-step measure is blind. It
+is found only by the judge, which is why the gate also fails on Gemini's scores.
+
+### L30. Everything currently fails the gate, and the pattern names the cause
+
+Ten renders across led18 and led19, $0.35. Median-of-three Gemini scores.
+
+| render | subject | loop | motion | image | verdict |
+|---|---|---|---|---|---|
+| `led18_cole_woods` | 9 | 10 | **6** | 9 | 8 confirmed motion/blur flags |
+| `led19_cole_soft` | 9 | 9 | **6** | 9 | morphing of branches and roots |
+| `led19_renoir_base` | 8 | **3** | 7 | **9** | loop broken, image the best of any run |
+| `led19_renoir_crop` | 9 | 8 | **3** | 6 | dissolves mid-loop, REJECT |
+| `led19_renoir_soft` | 8 | 9 | 7 | 7 | blur CONFIRMED 0.62x, morph 4.46x |
+
+**Motion 6 recurs on every Lightning render regardless of subject.** That is the
+systemic blocker, and it is Luca's own diagnosis: RIFE's flow field reconciling two
+keyframes whose composition and detail differ.
+
+**Two attempted fixes both backfired, and the direction is the lesson.**
+`crops_coords_top_left` 256 to 512 was meant to kill the canvas edge and instead
+destabilised the chain into a mid-loop dissolve (motion 3, image 6). Lowering
+`steady_strengths` to 0.40/0.42 was meant to reduce inter-keyframe difference and
+instead made it BLURRIER (confirmed 0.62x): repainting less means the model stops
+restoring detail, so RIFE's soft in-betweens are never refreshed. **Less repaint buys
+stability and costs sharpness**, which is the opposite trade from the light arc.
+
+### L31. SDXL base answers a question queued since 2026-05-19, and the answer is yes
+
+`led19_renoir_base` is the FIRST time pure SDXL base has run through the video
+pipeline: `lightning_lora: null`, 24 steps, `guidance_scale: 6.0`. Every render before
+it fused the 4-step Lightning distillation and then asked it for 20 steps, which is
+off-distribution.
+
+- **image 9, the best of any render this session**, and no blur or morphing flag
+  survived voting. Luca's 2026-05-19 keyframe-level verdict, "sdxl base reads more the
+  painting brush", now holds at video level.
+- **The canvas edge is gone.** At guidance 6.0 the negative branch finally carries
+  weight, so the `canvas edge, picture frame` ban that L25 measured inert at 1.5
+  actually bites. The edge fix and the backbone change are the same change.
+- **Loop 3, and that is the one thing to fix.** Score spread across runs was 7, so it
+  is a low-confidence number, but every run named the wrap. `return_: 2` and
+  `return_pixel_blend_max: 0.45` were tuned for Lightning and have never been tuned
+  for base.
+
+**Next: base plus loop closure.** That is the open thread, not another subject.
+
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 
 - **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,
