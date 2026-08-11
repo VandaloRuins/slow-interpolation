@@ -52,8 +52,19 @@ IMG_EXT = {".png", ".jpg", ".jpeg", ".webp"}
 VID_EXT = {".mp4", ".webm", ".mov", ".gif"}
 
 SHEET_SIZE = 4096          # must equal SHEET in glance.js -- UVs are t.x / SHEET
-MAX_CELL = 96
 THUMB = 512
+# Ceiling on the atlas cell. It was 96, which is the right cell for a THOUSAND
+# roughly-square photos and badly wrong for a small field of extreme aspects: a
+# 3.18:1 LED-wall strip only got 29px of height out of a 96px cell, so a tile
+# displayed at ~400px was a 4.4x upscale of a 93x29 source, i.e. visibly mushy,
+# while a sharp 512px copy of the same frame sat unused in thumbs/ next to it.
+#
+# There is no reason to cap below the source thumbnail: past THUMB the cell would
+# be padding, not detail. The min() against SHEET_SIZE // per_row below still
+# decides for large fields, so this changes nothing about how a big archive packs
+# (418 assets -> 195px, 1048 -> 124px) and simply stops starving the small ones
+# (21 assets -> 512px, a 1:1 copy of the thumbnail).
+MAX_CELL = THUMB
 
 # Directory names that are scaffolding rather than work: the old gallery's own
 # derived assets, deploy staging, harness logs, and this exporter's output. A
@@ -88,6 +99,85 @@ def run_of(rel: Path) -> tuple[str, str]:
     if not parts:
         return "root", "root"
     return slug(parts[-1]), slug(parts[0])
+
+
+# No \b after the letter: these names are NY1087B_090226, and "_" is a word
+# character, so there is no word boundary between the letter and the underscore.
+# With \b the pattern matched nothing at all, and every file still landed in a
+# plausible-looking cluster via the portrait fallback below -- which is exactly
+# the kind of silent miss that reads as a working feature.
+SCREEN_RE = re.compile(r"NY1087\s*([ABC])(?![A-Z0-9])", re.I)
+
+
+def screen_of(rel: Path, dims: tuple[int, int] | None) -> str:
+    """Which LED wall this file is FOR: screen-a, screen-bc, or unassigned.
+
+    THERE ARE THREE WALLS AND ONLY TWO GEOMETRIES. conform.py's SCREENS collapses
+    B and C into a single 1728x540 spec because they are physically identical, so
+    dimensions can identify wall A and can NEVER separate B from C. That is why
+    clustering this field by geometry tops out at two clusters no matter how the
+    layout is tuned -- the third cluster does not exist in the pixels.
+
+    The screen id survives in one place only: the delivery filename, NY1087A/B/C.
+
+    The b/c in a RENDER name is NOT a screen and must not be read as one. In
+    led13_b_realloc_soft vs led13_c_realloc_soft it is an experiment variant
+    letter -- the same content at two settings, discussed as such throughout
+    quality-first/progress.md. Reading it as a wall would file twelve candidate
+    renders under walls nobody has chosen for them yet.
+
+    A portrait file with no NY1087 tag is still wall A, because portrait is a
+    geometry only wall A has. A landscape one is genuinely undecided: it is
+    conformed to the B/C spec and could go to either, so it says so rather than
+    guessing. That honesty is the point of the third cluster.
+    """
+    m = SCREEN_RE.search(rel.name)
+    if m:
+        return "screen-a" if m.group(1).upper() == "A" else "screen-bc"
+    if dims and dims[0] < dims[1]:
+        return "screen-a"
+    return "unassigned"
+
+
+# conform.py stamps "__<screen>_<w>x<h>" onto a delivery file, so the manifest for
+# led13_c_realloc_soft__bc_1728x540.mp4 is led13_c_realloc_soft.manifest.json.
+CONFORM_SUFFIX_RE = re.compile(r"__[a-z]+_\d+x\d+$", re.I)
+
+
+def manifest_of(f: Path) -> Path | None:
+    """The run manifest for a render, following a conform suffix back to its parent."""
+    for stem in (f.stem, CONFORM_SUFFIX_RE.sub("", f.stem)):
+        m = f.with_name(stem + ".manifest.json")
+        if m.is_file():
+            return m
+    return None
+
+
+def lora_of(f: Path) -> str | None:
+    """The STYLE LoRA a render was made with, as a short label, or None if unknown.
+
+    This is the sub-order key inside a cluster: outputs sharing a LoRA sit together
+    instead of being scattered by sha, so a set you want to compare reads as a set.
+
+    `style_lora_path` is the one that matters. `lightning_lora` is the 4-step speed
+    adapter and is identical on every render here, so grouping by it would put
+    everything in one bucket and look like the feature was not working.
+
+    Returns None rather than guessing when there is no manifest, which is a real
+    gap and not a rare one: a conformed DELIVERY file is copied and renamed out of
+    its run, so nine of them carry no provenance at all, and the led16 renders were
+    written without a manifest. Unknowns group together as their own honest block.
+    """
+    m = manifest_of(f)
+    if not m:
+        return None
+    try:
+        p = json.loads(m.read_text(encoding="utf-8")).get("style_lora_path")
+    except Exception:
+        return None
+    if not p:
+        return None
+    return Path(p).stem          # models/loras/Thomas_Cole_epoch_10.safetensors -> Thomas_Cole_epoch_10
 
 
 def generated_ts(f: Path) -> float:
@@ -245,6 +335,12 @@ def main() -> int:
                          "in its name, so a name filter silently missed 5 of the 6 "
                          "vertical pieces. Standing, so tomorrow's conform qualifies "
                          "automatically.")
+    ap.add_argument("--cluster-by", choices=("dir", "screen"), default="dir",
+                    help="what a cluster MEANS. 'dir' (default) clusters by the "
+                         "render's directory, which is the run that made it. "
+                         "'screen' clusters by the LED wall the file is for "
+                         "(screen-a / screen-bc / unassigned) -- the deliverable "
+                         "view rather than the production view.")
     ap.add_argument("--dest", default=None,
                     help="output dir (default outputs/_glance); thumbs are still cached "
                          "in outputs/_glance/thumbs and copied in")
@@ -344,20 +440,51 @@ def main() -> int:
                       "w": cw, "h": ch, "aspect": round(aspect, 4)}
 
         run, group = run_of(rel)
+        ctx = group
+        if args.cluster_by == "screen":
+            # The cluster becomes the WALL. The production origin (the run
+            # directory) stays on the record as `context`, so it is still shown
+            # and still searchable -- it just stops deciding the layout. The
+            # viewer needs no change for this: it already clusters on the field's
+            # event key, so choosing what that key MEANS is the exporter's job,
+            # which keeps the wall vocabulary out of a shared viewer.
+            #
+            # `group` MUST become the screen too, not the old run. clusterKey()
+            # resolves `group || event`, so leaving the directory in `group`
+            # silently overrides the whole thing: the clusters still came out
+            # correct (21/5/4) because every member of a screen shares one first
+            # directory, and every region was then LABELLED with that directory --
+            # led / delivery / candidate. Right grouping, wrong name, and the
+            # counts matching made it look like it had worked.
+            ctx = group
+            run = screen_of(rel, dimensions(f))
+            group = run
         date = datetime.fromtimestamp(f.stat().st_mtime, timezone.utc).date().isoformat()
         kind = "frame" if is_frame else ("render" if is_video else "still")
         caption = rel.stem.replace("_", " ").replace("-", " ")
-        scene = [s for s in {kind, group, "video" if is_video else "image"} if s]
+        scene = [s for s in {kind, group, ctx, "video" if is_video else "image"} if s]
 
         events.setdefault(run, {"slug": run, "label": run.replace("-", " "),
                                 "venue": group, "date": date, "kind": kind,
                                 "group": group, "order": len(events) + 1,
-                                "description": f"{group} / {run}"})
+                                "description": f"{ctx} / {run}"})
+        lora = lora_of(f)
+        dims = dimensions(f) if is_video else None
         field.append({
             "sha": sha, "key": rel.as_posix(), "date": date, "event": run,
-            "context": group, "media_type": "video" if is_video else "photo",
+            "context": ctx, "media_type": "video" if is_video else "photo",
             "asset_class": kind, "artists": [], "public": True,
             "caption_short": caption, "color": colour, "has_thumb": True,
+            # Geometry ON THE RECORD. It previously existed ONLY inside the atlas
+            # index, so the viewer could draw the right shape and could not tell you
+            # what that shape WAS -- no spec chip, no "show me only the verticals",
+            # and no way for a card to state the delivery size of a delivery file.
+            "width": dims[0] if dims else None,
+            "height": dims[1] if dims else None,
+            # Sub-order inside the cluster: same LoRA sits together. The viewer
+            # treats this as an opaque string (layout.js subgroupCmp), so the
+            # LoRA vocabulary stays here rather than in a shared renderer.
+            "subgroup": lora,
         })
         cat_assets.append({
             "key": rel.as_posix(), "bytes": f.stat().st_size,
@@ -365,6 +492,8 @@ def main() -> int:
             "ingested": datetime.fromtimestamp(f.stat().st_mtime, timezone.utc)
                                 .isoformat().replace("+00:00", "Z"),
             "thumb": f"{sha}.jpg",
+            "width": dims[0] if dims else None,
+            "height": dims[1] if dims else None,
             # Direct path to the original, relative to the page. Lets the card play
             # video and show full-resolution stills with NO backend at all: serve.py
             # mounts these with --originals. Nothing signs anything.

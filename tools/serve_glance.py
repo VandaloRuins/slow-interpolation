@@ -112,6 +112,42 @@ def make_handler(root: Path, token: str | None):
         def __init__(self, *a, **kw):
             super().__init__(*a, directory=str(root), **kw)
 
+        def end_headers(self):
+            # NEVER let this server's own copy of the viewer be cached.
+            #
+            # SimpleHTTPRequestHandler answers conditional requests with 304, so a
+            # browser keeps serving the module it already has. That is fine for a
+            # static host and actively harmful here, because this server exists to
+            # look at a build you are CHANGING: edit layout.js, reload, and the page
+            # runs yesterday's file while looking exactly like it ran today's.
+            #
+            # It cost three false readings on 2026-08-11 -- a stylesheet that "did
+            # not apply" was in the file and not in the sheet, and a layout change
+            # measured as having no effect (17.7% vs 17.6% viewport fill) when the
+            # page had simply never loaded it. A silent stale module does not look
+            # like a caching problem, it looks like your change did nothing, which
+            # is the most expensive way to be wrong.
+            #
+            # Data and media stay cacheable: they are big, they do not change while
+            # you iterate, and re-fetching 80 MB of video on every reload would make
+            # the tunnel unusable.
+            p = self.path.split("?", 1)[0]
+            if p.endswith((".js", ".css", ".html", ".json")) or p == "/":
+                self.send_header("Cache-Control", "no-store, must-revalidate")
+            super().end_headers()
+
+        def send_head(self):
+            # Suppress the 304 path as well. end_headers() sets the response header,
+            # but a conditional request is answered from If-Modified-Since before a
+            # body is ever considered, so the header alone still lets the browser
+            # keep the copy it has. Dropping the validator forces a full 200.
+            p = self.path.split("?", 1)[0]
+            if p.endswith((".js", ".css", ".html", ".json")) or p == "/":
+                for h in ("If-Modified-Since", "If-None-Match"):
+                    if h in self.headers:
+                        del self.headers[h]
+            return super().send_head()
+
         def log_message(self, fmt, *args):
             # Static noise is useless here; the POST logs itself explicitly.
             #
@@ -242,10 +278,25 @@ def make_handler(root: Path, token: str | None):
                 if cat.is_file():
                     return self._patched_catalogue(cat)
             # Range for the bundled proxies too, so seeking works on those.
+            #
+            # UNQUOTE FIRST. `self.path` is percent-encoded, so a delivery file named
+            # "VANDALO RUINS_... .mp4" arrives as "VANDALO%20RUINS_... .mp4" and
+            # `root / raw` names a file that does not exist. is_file() was therefore
+            # False, this branch was skipped, and the request fell through to
+            # SimpleHTTPRequestHandler -- which ignores Range and answers 200 with
+            # the whole file. Safari treats a 200 to a range probe as "this server
+            # cannot seek", so playback is unreliable and scrubbing impossible.
+            #
+            # It hit exactly the 9 client deliverables and nothing else, because they
+            # are the only files here with spaces in their names: the range support
+            # was real, it just never ran for the files that matter most. Measured
+            # 2026-08-11: 9 of 26 answered 200 instead of 206.
             if raw.endswith(".mp4"):
-                f = root / raw.lstrip("/")
-                if f.is_file():
-                    return self._serve_file(f)
+                rel = urllib.parse.unquote(raw).lstrip("/")
+                if "\\" not in rel and ".." not in rel:
+                    f = root / rel
+                    if f.is_file():
+                        return self._serve_file(f)
             return super().do_GET()
 
         def do_POST(self):  # noqa: N802

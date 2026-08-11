@@ -59,6 +59,78 @@ def proxy_for(key: str) -> Path | None:
     return p if p.is_file() else None
 
 
+# ---- bundle proxies -------------------------------------------------------
+# gallery.py only builds a preview when the ORIGINAL exceeds 12 MB, and the deploy
+# only ships a file under 4 MB. Between those two numbers is a hole, and most of the
+# archive was sitting in it: measured 2026-08-11 over 209 videos, 82 were 4-12 MB
+# originals with no proxy and no way to ship, against 28 whose proxy was merely too
+# big. So the headline "72% of the videos do not play" was never a budget problem to
+# be accepted -- it was a threshold mismatch between two tools, and the deployed
+# bundle was using only 74 of its own 95 MB while it happened.
+#
+# These proxies are built for the BUNDLE, not for local playback, which is why they
+# live in their own cache rather than reusing gallery.py's: different purpose,
+# different size target, and mixing them would make each tool's cache unpredictable
+# to the other.
+BUNDLE_PROXIES = ROOT / "outputs" / "_gallery" / "bundle-proxies"
+BUNDLE_W = 854          # 480p-class: ample for deciding whether you like a render
+BUNDLE_CRF = 32         # measured on this content: a 23 s clip lands at ~0.30 MB
+
+
+def _duration(src: Path) -> float | None:
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "csv=p=0", str(src)],
+            check=True, capture_output=True, text=True, timeout=60).stdout.strip()
+        return float(out) if out else None
+    except Exception:
+        return None
+
+
+def bundle_proxy(src: Path, cap_mb: float) -> Path | None:
+    """A proxy sized to fit `cap_mb`, cached. None if ffmpeg cannot produce one.
+
+    CRF with a bitrate CEILING rather than a flat bitrate: this content is slow and
+    compresses very well, so a fixed bitrate would waste the budget on clips that do
+    not need it. CRF spends what each clip actually costs, and the ceiling exists only
+    to stop one 122 s outlier eating the whole bundle -- measured, that one clip is
+    worth 6.4 MB at these settings while the median clip is worth 0.3 MB.
+    """
+    if not src.is_file():
+        return None
+    BUNDLE_PROXIES.mkdir(parents=True, exist_ok=True)
+    dur = _duration(src)
+    # ceiling in kbit/s that keeps the whole clip inside the cap (0.92 for container
+    # overhead); floor it so a very long clip stays watchable rather than becoming mush
+    ceil_k = max(180, int(cap_mb * 8 * 1000 * 0.92 / dur)) if dur and dur > 0 else 900
+    # QUANTISED so the cache survives a budget nudge. Keying on cap_mb directly was
+    # wrong: under --fair-share the cap is budget/count, so adding one video to the
+    # archive changed the cap for EVERY video and invalidated the whole cache, which
+    # turns a 30-second rebuild into a full re-encode of two hours of footage. What
+    # actually determines the output is the bitrate ceiling, and rounding it to 50k
+    # means a small change in the budget reuses the files it already has.
+    ceil_k = int(round(ceil_k / 50.0) * 50)
+    stamp = f"{src.stat().st_mtime_ns}:{src.stat().st_size}:{BUNDLE_W}:{BUNDLE_CRF}:{ceil_k}"
+    tag = hashlib.sha256((src.as_posix() + stamp).encode()).hexdigest()[:16]
+    dest = BUNDLE_PROXIES / f"{tag}.mp4"
+    if dest.is_file():
+        return dest
+    cmd = ["ffmpeg", "-v", "error", "-y", "-i", str(src),
+           "-vf", f"scale='min({BUNDLE_W},iw)':-2:force_original_aspect_ratio=decrease",
+           "-c:v", "libx264", "-preset", "veryfast", "-crf", str(BUNDLE_CRF),
+           "-maxrate", f"{ceil_k}k", "-bufsize", f"{ceil_k * 2}k",
+           "-pix_fmt", "yuv420p",
+           # faststart or the browser must fetch the whole file before it can start
+           "-movflags", "+faststart", "-an", str(dest)]
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, timeout=1800)
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        dest.unlink(missing_ok=True)
+        return None
+    return dest if dest.is_file() and dest.stat().st_size > 0 else None
+
+
 def human(mb: float) -> str:
     return f"{mb:,.1f} MB"
 
@@ -73,6 +145,15 @@ def main() -> int:
                     help="the glance tool checkout (holds install.py + payload/)")
     ap.add_argument("--title", default="Slow Interpolation")
     ap.add_argument("--collection", default="renders")
+    ap.add_argument("--fair-share", action="store_true", default=True,
+                    help="size every video's proxy to an equal share of the bundle "
+                         "budget so ALL of them play, instead of shipping "
+                         "smallest-first until the budget runs out (default on)")
+    ap.add_argument("--no-fair-share", dest="fair_share", action="store_false",
+                    help="flat --max-asset-mb cap; long clips get cut at the budget")
+    ap.add_argument("--no-bundle-proxies", action="store_true",
+                    help="do not encode a bundle proxy for a video that is too big "
+                         "to ship; drop its playback instead (the old behaviour)")
     ap.add_argument("--no-video", action="store_true",
                     help="ship the field only; every card keeps poster + record")
     ap.add_argument("--max-asset-mb", type=float, default=4.0,
@@ -199,8 +280,29 @@ def main() -> int:
 
     # 3) video, smallest first so the budget buys the most playable cards
     shipped: dict[str, str] = {}
+    made_proxies = 0
+    skipped_big = 0
+    skipped_budget = 0
     total_mb = sum(f.stat().st_size for f in out.rglob("*") if f.is_file()) / 1e6
     if not args.no_video:
+        # The per-file cap is a FAIR SHARE of what is left, not a fixed number.
+        #
+        # `cands.sort()` ships smallest-first and stops at the budget, so with a flat
+        # cap the long clips are always the ones cut -- and they are cut for being
+        # long, which has nothing to do with whether they are worth seeing. Measured
+        # here: a flat 4 MB cap left 73 of 261 videos unplayable while every single
+        # one of them was individually under the cap. The budget was the binding
+        # limit and the cap was not doing the rationing, so nothing rationed fairly.
+        #
+        # Dividing the remaining budget by the number of videos makes every card
+        # playable by construction: a 20 s clip does not notice the ceiling, and a
+        # 120 s one is encoded thinner, which is the right trade for a field whose
+        # job is deciding what you want to look at properly later.
+        fair = (args.max_mb * 0.97 - total_mb) / max(1, len(videos))
+        cap_mb = min(args.max_asset_mb, fair) if args.fair_share else args.max_asset_mb
+        if args.fair_share:
+            print(f"  fair-share cap: {cap_mb:.2f} MB/video "
+                  f"({len(videos)} videos in {args.max_mb - total_mb:.0f} MB of budget)")
         cands = []
         for a in videos:
             p = proxy_for(a["key"])
@@ -214,14 +316,28 @@ def main() -> int:
                 # no reason. The caps still decide.
                 orig = ROOT / "outputs" / a["key"]
                 p = orig if orig.is_file() else None
+            # Neither candidate fits? Encode one that does, rather than dropping the
+            # card. This is the step that closes the 4-to-12 MB hole: before it, a
+            # 6 MB original was simply not shippable and its card said "not published
+            # in this archive", which reads as a broken archive rather than as a
+            # threshold nobody had noticed.
+            if not args.no_bundle_proxies:
+                src = p if p else (ROOT / "outputs" / a["key"])
+                if src and src.is_file() and src.stat().st_size / 1e6 > cap_mb:
+                    bp = bundle_proxy(src, cap_mb)
+                    if bp:
+                        made_proxies += 1
+                        p = bp
             if p:
                 cands.append((p.stat().st_size / 1e6, a["key"], p))
         cands.sort()
         (out / "media").mkdir(exist_ok=True)
         for mb, key, p in cands:
             if mb > args.max_asset_mb:
+                skipped_big += 1
                 continue
             if total_mb + mb > args.max_mb:
+                skipped_budget = len(cands) - len(shipped) - skipped_big
                 break
             dest_name = key.replace("/", "__")
             shutil.copy2(p, out / "media" / dest_name)
@@ -276,6 +392,15 @@ def main() -> int:
           f"{len(cat['assets']) - len(videos)} still)")
     print(f"  {kept} video playable in the browser; "
           f"{len(videos) - kept} keep poster + record only")
+    if made_proxies:
+        print(f"  {made_proxies} bundle proxies encoded ({BUNDLE_W}px crf{BUNDLE_CRF}, cached)")
+    # Never let a drop be silent: an unexplained missing card looks like a bug in the
+    # viewer, and the two causes want opposite fixes (raise --max-asset-mb vs raise
+    # --max-mb), so the number that matters is WHICH limit bit.
+    if skipped_big:
+        print(f"  {skipped_big} dropped: still over --max-asset-mb ({args.max_asset_mb} MB)")
+    if skipped_budget > 0:
+        print(f"  {skipped_budget} dropped: bundle budget --max-mb ({args.max_mb} MB) reached")
     print(f"  {n_files:,} files, {human(total_mb)}")
     if total_mb > args.max_mb:
         print(f"\nREFUSING: {human(total_mb)} exceeds --max-mb {args.max_mb}", file=sys.stderr)

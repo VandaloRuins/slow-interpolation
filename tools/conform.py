@@ -134,6 +134,42 @@ def main() -> int:
     ok = (ow, oh, on) == (tw, th, TARGET_FRAMES)
     print(f"wrote       : {out}")
     print(f"verified    : {ow}x{oh}, {on} frames, {on / TARGET_FPS:.3f} s  {'OK' if ok else 'MISMATCH'}")
+
+    # Carry the run manifest forward onto the delivery file.
+    #
+    # PROVENANCE DIES AT THE COPY. A conformed file inherits none of the record of
+    # what made it, so once it is renamed for a client -- which is exactly what
+    # happens to a delivery, e.g. "VANDALO RUINS_..._NY1087A_090226.mp4" -- there is
+    # no path back to the run at all. Measured 2026-08-11 while grouping the Glance
+    # field by style LoRA: 13 of 30 assets could not name the LoRA that produced
+    # them, and 9 of those were delivery copies. The suffix-stripping fallback in
+    # glance_export only rescues files that still carry the conform suffix; a rename
+    # defeats it, and a rename is the normal end of this pipeline.
+    #
+    # Writing a sibling manifest here fixes it at the only point that still knows.
+    # `conformed_from` records the parent so the chain stays walkable even after the
+    # file is renamed, as long as the manifest travels with it.
+    src_man = None
+    for cand in (src.with_name(src.stem + ".manifest.json"),):
+        if cand.is_file():
+            src_man = cand
+            break
+    if src_man:
+        try:
+            man = json.loads(src_man.read_text(encoding="utf-8"))
+        except Exception:
+            man = {}
+        man["conformed_from"] = src.name
+        man["conform_screen"] = args.screen
+        man["conform_target"] = f"{tw}x{th}"
+        out.with_name(out.stem + ".manifest.json").write_text(
+            json.dumps(man, indent=2), encoding="utf-8")
+        print(f"provenance  : {out.stem}.manifest.json (from {src_man.name})")
+    else:
+        # Say so rather than leaving a silent gap: an unprovenanced delivery is the
+        # thing that later cannot be grouped, credited, or reproduced.
+        print(f"provenance  : NONE -- {src.name} has no manifest, so {out.name} "
+              f"carries no record of the run that made it")
     return 0 if ok else 1
 
 
