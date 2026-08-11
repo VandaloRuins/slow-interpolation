@@ -95,25 +95,81 @@ the exhibition work, exported with `--since-days` / `--include`.
 ```
 python tools/glance_export.py --no-frames --since-days 8 --dest outputs/_glance-ledwall
 python tools/glance_deploy.py --export outputs/_glance-ledwall --out outputs/_glance-ledwall-deploy     --pin ledwall --curate --title "Slow Interpolation -- LED Wall" --collection ledwall --deploy --prod
+
+# ...and to curate WITH the automatic return path, serve the same build yourself:
+python tools/serve_glance.py --port 8766        # prints a LAN URL for the phone
+cloudflared tunnel --url http://127.0.0.1:8766  # only if Luca is not on the wifi
 ```
 
 `--since-days` dates by MANIFEST (`started_at_utc`), never mtime: syncs rewrite mtime and
 a mtime window sweeps in years-old work.
 
-**Curation round trip (tier 0).** `--curate` injects `tools/glance_curate.js`: a curate
+**Curation (tier 0). Removal is LOCAL, IMMEDIATE and REVERSIBLE.** `--curate` injects
+`tools/glance_curate.js` plus the pre-boot shim `tools/glance_curate_hide.js`. The curate
 chip enters the field's own select mode (it always existed but lies dormant below tier 1;
 only the download layer ever enabled it), tiles toggle with taps, long-press takes a
-cluster, "export removals" downloads `glance-removals.json` carrying KEYS. Rebuild with
-`glance_export.py --exclude-file glance-removals.json` and redeploy. Real in-field Tier 2
-curation lives ONLY in the private RNMW-agent repo and would be a hand-port
-(`write.js` hardcodes RNMW's EVENT_PROFILES); the white-label manifest excludes it by design.
+cluster, and `remove N` takes them off the field and keeps them off.
 
-**Immutable is for content-keyed names ONLY.** `atlas-index.json` and `sheet-0.jpg` keep
-their names across rebuilds; marking `atlas/` immutable froze every prior visitor on the
-old field forever (immutable entries are never revalidated; no ordinary reload recovers).
-Fixed in `glance_deploy.py`: immutable = `thumbs/<sha>` only. Anyone who visited before
-2026-08-10 needs ONE hard refresh. Diagnostic that found it: fetch the same URL from
-inside the live page with default cache and with `{cache:'no-store'}` and compare.
+It works through the viewer's OWN contract, not a hack: `glance.js` drops any catalogue
+asset tagged `archived` before it reaches the field, and the data contract documents that
+as `"archived": true = hidden from the field entirely`. Setting the flag is normally a
+tier-2 server capability, so the shim sets it on the RESPONSE. The JSON on the CDN is never
+modified, and with nothing hidden the shim leaves `window.fetch` untouched. The shim must be
+injected as a CLASSIC script BEFORE the `glance.js` module, because `glance.js` calls
+`boot()` at module evaluation; `glance_deploy.py` asserts on the anchor rather than shipping
+a silently inert shim.
+
+**Two stores, and the distinction is the design.** `marks` is the transient ringed
+selection; `hidden` is the accumulated removal list that drives the shim AND is what gets
+sent or exported. Hidden entries self-prune once a rebuild has removed the asset for real.
+
+**Four ways back, in increasing bluntness**, because a long-press selects a WHOLE CLUSTER
+and on a phone that is one slightly-too-long tap from hiding sixty cards (it happened):
+bulk-confirm needs a second tap at 10 or more; `undo` restores the pre-removal list for ten
+minutes and survives the reload; `restore` clears everything hidden; `?curate=reset` clears
+it from a link. And the **curation epoch** constant in the shim invalidates local curation
+state on EVERY device at the next ordinary load, which is the only server-side lever over a
+per-device store. Bump it when a device is stuck.
+
+**The return path.** Hiding is per-DEVICE and invisible to the agent, so a removal only
+becomes real for every viewer via a rebuild. Two routes:
+- **Automatic (preferred).** Serve the build with `tools/serve_glance.py`; the face probes
+  `curate/removals`, finds the same-origin sink and POSTs the whole list on every removal.
+  It lands in `outputs/_glance-inbox/latest.json` plus a stamped audit copy. No CORS, no
+  secret, no credential. Then `glance_export.py --exclude-file` and redeploy.
+- **Manual fallback.** On the Vercel deploy the probe 404s, so the primary button becomes
+  `export list` and the file is handed over. One build serves both, self-configuring.
+
+A permanent version (a Vercel function committing the list into the repo, token in Vercel
+env vars only, never in the browser) is priorities row DT14.
+
+Real in-field Tier 2 curation lives ONLY in the private RNMW-agent repo and would be a
+hand-port (`write.js` hardcodes RNMW's EVENT_PROFILES); the white-label manifest excludes it
+by design.
+
+**Immutable is for content-keyed names ONLY, so MAKE the name content-keyed.** The atlas is
+fetched by fixed names (`atlas-index.json`, `sheet-0.jpg`) yet rewritten every build, which
+made it the one thing a browser could get permanently wrong. It did: serving `atlas/`
+immutable froze visitors on a 49-tile atlas after the field had grown, and immutable entries
+are NEVER revalidated, so no ordinary reload recovers. It resurfaced 2026-08-10 on a phone
+showing 49 of 117 assets in a collapsed layout, because `glance.js` silently skips any field
+asset missing from the atlas (`const t = tiles[a.sha]; if (!t) continue;`) — so ONE stale
+atlas drops most of the field AND wrecks the clustering, which reads as two separate bugs.
+
+Fixed properly in `glance_deploy.py`: the atlas ships as **`atlas-<sha256[:10]>/`**, so the
+NAME follows the CONTENT. A stale entry is orphaned rather than consulted, an
+already-broken browser repairs itself on the next load with nothing asked of the user, and
+`immutable` becomes CORRECT for the atlas rather than dangerous. No viewer change was
+needed: `atlasBase` is a runtime config field and `glance.js` resolves both atlas fetches
+through `atlasUrl()`.
+
+**`glance/*` must stay short-lived (`max-age=60`), and this is load-bearing.** It holds
+`glance.config.js`, which names the atlas directory; a cached config pointing at a retired
+`atlas-<hash>/` would 404 the whole field, which is worse than the staleness it fixes.
+
+Diagnostic that found both: fetch the same URL from inside the live page with default cache
+and with `{cache:'no-store'}` and compare. And check the SERVED catalogue count, never the
+build log.
 
 ## Costs and posture
 
