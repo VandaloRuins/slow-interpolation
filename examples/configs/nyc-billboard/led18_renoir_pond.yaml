@@ -1,0 +1,104 @@
+# LED wall, 16:5 band. 1536x896 render -> 1728x540 delivered, 10.000 s, 30 fps.
+#
+# STYLE SWEEP. Luca 2026-08-11: "drop the Course of Empire reference, work on subjects
+# in the art styles we have loras trained for ... this is an exercise of style, no
+# conceptual work, can the outputs be really just beautiful?"
+#
+# So: no narrative, no landmark, no arc. One subject per LoRA that the LoRA was
+# actually trained on, and the only thing that moves across the loop is the LIGHT.
+#
+# NO CONTROL MAP, on purpose. The 16:5 delivery keeps only rows 288 to 762, a 53%
+# band. A composition with a horizon and a focal point needs a map to survive that
+# crop; an ALL-OVER FIELD does not, because every band is an equally good crop and
+# the same subject also works vertically. That is open direction D1(b), and it is
+# what makes a pure style exercise possible at this geometry.
+#
+# INTERPOLATION IS THE led17 RECIPE, measured the same day: K=10 at passes 5 with
+# skip_boundary 0 gives 10 * 31 - 1 = 309 raw frames. skip_boundary 0 makes a keyframe
+# crossing an ordinary frame instead of a 9x lurch (measured 2.31 -> 0.99), and landing
+# on 309 means conform drops 9 frames instead of 139, which took frame-to-frame
+# roughness 0.55 -> 0.18. Strengths are the matching coupled-dial value, 9 real steps
+# at 20, and lowering them nearly doubled the light arc on both screens.
+#
+#     python tools/conform.py --screen bc --crop-y 288 --src <render>.mp4
+
+seed: 1087
+
+style:
+  name: renoir_flowers_epoch_10
+  lora_path: models/loras/Renoir_Flowers_epoch_10.safetensors
+  lora_scale: 0.85
+  prefix: "rfl, "
+  suffix: ""
+  negative_prompt: "photograph, 3D render, digital art, smooth blending, picture frame, ornate border, vignette, canvas edge, artist signature, watermark, blurry, text, people, figures, boat, horizon, sky"
+
+subject:
+  name: led18_renoir_pond
+  # Subject clause byte-identical across A and B; only the light phrase moves (L21).
+  prompts:
+    - label: "A: pale silver light"
+      prompt: >-
+        pale silver light, a still pond surface filling the whole frame, floating lilies and reflected leaves, broken colour
+    - label: "B: warm afternoon light"
+      prompt: >-
+        warm afternoon light, a still pond surface filling the whole frame, floating lilies and reflected leaves, broken colour
+    - label: "A (return): pale silver light"
+      prompt: >-
+        pale silver light, a still pond surface filling the whole frame, floating lilies and reflected leaves, broken colour
+
+resolution:
+  width: 1536
+  height: 896
+
+# K = (2+1) + (4+2) + 1 = 10. raw = 10 * 31 - 1 = 309, nine frames from target.
+frames:
+  steady: 2
+  steady_per_segment: [2, 4]
+  transition: 1
+  return_: 2
+  warmup: 3
+
+render:
+  structural_decay_radius: 1
+  steady_strengths: [0.46, 0.48, 0.46, 0.48, 0.46, 0.48, 0.46, 0.48]
+  transition_strength: 0.50
+  return_strength_start: 0.46
+  return_strength_end: 0.40
+  return_pixel_blend_max: 0.45
+
+sampling:
+  num_inference_steps: 20
+  guidance_scale: 1.5
+
+rife:
+  passes: 5
+  skip_boundary: 0
+  edge_crop: 8
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/nyc-billboard/led
