@@ -1034,6 +1034,75 @@ off-distribution.
 
 **Next: base plus loop closure.** That is the open thread, not another subject.
 
+### L32. The output analyser: what was built, and the three detectors that do NOT exist
+
+Luca 2026-08-11: build an analyser that reads speed, smoothness, focus and artefacts,
+so renders can be produced, benchmarked, improved and iterated into a set worth
+curating. Shipped as [`tools/analyse_render.py`](../../../../tools/analyse_render.py)
+alongside [`tools/review_gate.py`](../../../../tools/review_gate.py).
+
+**What works, with floors.** speed (optical-flow magnitude, which unlike frame
+differencing does not confuse a light change with a move), lurch, jitter, loop,
+flicker, focus mean AND trough, and `rigid%`, the share of flow energy explained by a
+global affine fit. Floors from the repro pair: lurch +-2%, focus +-1.3%, trough
++-1.6%, loop +-8%, arc +-0.1%, Gemini +-2 on loop and +-1 elsewhere.
+
+**Three detectors were attempted and do not exist. Recording them so nobody spends
+another day on them without new evidence.**
+
+1. **Border / painted canvas edge.** FIVE statistics tried against a hand-labelled
+   set of four dirty and four clean clips; all five overlap. HF energy in the band,
+   streak direction, bin-count-corrected streak direction, strongest vertical edge
+   near the border, local tile detail, per-pixel temporal variance. The artefact is
+   repainted every keyframe, so it drifts with the picture and is neither spatially
+   nor temporally anomalous. **Gemini never flagged it either**, because it watches a
+   downscaled clip and the band is 3% of the width. Only opening a native-resolution
+   edge strip found it. The gate writes those strips; they get looked at.
+2. **Rubbery morphing.** Three flow measures tried, none matched the judgement:
+   residual-px tracks speed almost exactly (so it measures speed, not rubberiness),
+   spatial roughness spans 0.148 to 0.239 with no ordering, and temporal coherence
+   puts `led19_renoir_base` LOWEST at 0.492 despite it being the one clip with no
+   morph flag.
+3. **A single-number quality score.** Not attempted on purpose, see below.
+
+**The reason the last two failed is methodological and it matters more than the
+metrics.** Each was being fitted to ONE Gemini label per clip, at +-1 noise, across
+clips that differ in backbone, subject, palette and schedule simultaneously. That is
+not a validation set. Any threshold fitted that way is fitted to noise.
+
+**So the proposal is to build the labelled set from the curation loop that already
+exists.** Luca already removes cards he does not like, and that removal list is a
+labelled rejection set sitting unused in `outputs/_glance-inbox/`. Pair each removal
+with the analyser's row for that clip and the thresholds can be FITTED to his taste
+instead of guessed. Until roughly 20 to 30 labelled clips exist, the analyser should
+report numbers and refuse to render a verdict, which is what it currently does.
+
+### L33. SDXL base is better paint on a less stable chain, and the fix is calibration
+
+`led19_renoir_base` against `led18_renoir_field`, identical prompt and subject, only
+the backbone differing:
+
+| | Lightning | base |
+|---|---|---|
+| Gemini image | 8 | **9** |
+| morph / blur flags surviving a majority vote | several | **none** |
+| canvas edge | present | **gone** |
+| lurch | 0.01 | **2.09** |
+| flicker events | 2 | **24** |
+| jitter | 0.13 | **0.31** |
+
+**Diagnosis: base was run at Lightning's strength.** At 24 steps, `strength 0.46` is
+11 real steps of a NON-distilled model, which is a far heavier repaint than 9 steps of
+Lightning. Heavier repaint means keyframes that differ more, which is exactly the
+instability the numbers show. Base needs its own denoise calibration, roughly 0.30 to
+0.35, and that is the next render rather than another subject.
+
+One caution on the focus column: `renoir_base` reads 0.0561 against `renoir_field`'s
+0.0091, a 6x gain. **Do not quote that as a sharpness win.** The measure is a ratio
+against total spectral energy, and base's pastel low-contrast surface inflates it. The
+metric's own docstring says it is not comparable between compositions, and two renders
+of the same subject at very different contrast are two different compositions.
+
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 
 - **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,
