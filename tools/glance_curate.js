@@ -65,6 +65,17 @@ const COLLECTION = (window.GLANCE_CONFIG || {}).collection || "";
 const MARKS_KEY = `glance-curate-marks:${COLLECTION}`;
 const HIDDEN_KEY = `glance-curate-hidden:${COLLECTION}`;
 const EXPORTED_KEY = `glance-curate-exported:${COLLECTION}`;
+const UNDO_KEY = `glance-curate-undo:${COLLECTION}`;
+
+// A long-press selects the WHOLE CLUSTER the pressed tile belongs to, which on a
+// phone is one slightly-too-long tap away from selecting sixty cards. That
+// happened, and `remove` was then a single tap. So two guards:
+//   CONFIRM   a removal of BULK_CONFIRM_AT or more needs a second tap
+//   UNDO      any removal can be reversed for UNDO_WINDOW_MS, and the record
+//             survives the reload that performs the removal
+const BULK_CONFIRM_AT = 10;
+const UNDO_WINDOW_MS = 10 * 60 * 1000;
+let armed = false;   // primary is waiting for its confirming second tap
 
 // A SINK is a same-origin endpoint that accepts the removal list, so a removal
 // reaches the agent with no download and no file handling. `serve_glance.py`
@@ -231,10 +242,20 @@ function render() {
     els.status.textContent = "tap cards to remove";
   }
 
-  // ONE primary action, chosen by context. remove / export / nothing.
+  // ONE primary action, chosen by context: undo / remove / export / nothing.
+  // Undo outranks everything, because if a removal was a mistake that is the
+  // only thing you want the moment the page comes back.
+  const undo = readUndo();
   let p = null;
-  if (marks.size) p = { label: `remove ${marks.size}`, act: "remove", cls: "cur8-danger" };
-  else if (owed > 0) p = { label: "export list", act: "export", cls: "cur8-go" };
+  if (marks.size) {
+    p = armed
+      ? { label: `tap again to remove ${marks.size}`, act: "remove", cls: "cur8-danger" }
+      : { label: `remove ${marks.size}`, act: "remove", cls: "cur8-danger" };
+  } else if (undo) {
+    p = { label: `undo · bring back ${undo.restores}`, act: "undo", cls: "cur8-go" };
+  } else if (owed > 0) {
+    p = { label: "export list", act: "export", cls: "cur8-go" };
+  }
   els.primary.hidden = !p;
   if (p) {
     els.primary.textContent = p.label;
@@ -261,9 +282,11 @@ function payloadFor(map) {
   };
 }
 
-/** Send the removal list to the same-origin sink. Returns true if it landed. */
+/** Send the removal list to the same-origin sink. Returns true if it landed.
+ *  An EMPTY list is deliberately sendable: after an undo or a restore it is the
+ *  whole message, meaning nothing should be excluded any more. */
 async function sendToSink(map) {
-  if (!sinkReady || !map.size) return false;
+  if (!sinkReady) return false;
   try {
     const r = await fetch(SINK, {
       method: "POST",
@@ -277,8 +300,62 @@ async function sendToSink(map) {
   }
 }
 
+/** The pre-removal hidden list, if a removal is still inside its undo window. */
+function readUndo() {
+  try {
+    const raw = localStorage.getItem(UNDO_KEY);
+    if (!raw) return null;
+    const rec = JSON.parse(raw);
+    if (!rec || !Array.isArray(rec.prev) || !rec.at) return null;
+    if (Date.now() - rec.at > UNDO_WINDOW_MS) {
+      localStorage.removeItem(UNDO_KEY);
+      return null;
+    }
+    // `restores` is what undoing would put back, which is the number worth
+    // showing on the button rather than the size of the saved list.
+    return { prev: rec.prev, restores: Math.max(0, hidden.size - rec.prev.length) };
+  } catch (e) {
+    return null;
+  }
+}
+
+function undoLastRemoval() {
+  const rec = readUndo();
+  if (!rec) return;
+  hidden = new Map(rec.prev.filter(h => h && h.sha16).map(h => [h.sha16, h.key || null]));
+  writeStore(HIDDEN_KEY, hidden);
+  exportedCount = 0;   // the list changed, so a previous send no longer describes it
+  try {
+    localStorage.setItem(EXPORTED_KEY, "0");
+    localStorage.removeItem(UNDO_KEY);
+  } catch (e) {}
+  // Tell the agent too, so its copy matches the device again. An empty list is a
+  // legitimate message: it means nothing should be excluded.
+  if (sinkReady) sendToSink(hidden).finally(() => location.reload());
+  else location.reload();
+}
+
 async function removeSelected() {
   if (!marks.size) return;
+  // Bulk removals need a second tap. A whole cluster can be selected by accident
+  // with one long press, and this is the only thing standing between that and
+  // sixty cards leaving the field.
+  if (marks.size >= BULK_CONFIRM_AT && !armed) {
+    armed = true;
+    render();
+    clearTimeout(removeSelected.t);
+    removeSelected.t = setTimeout(() => { armed = false; render(); }, 5000);
+    return;
+  }
+  armed = false;
+  // Snapshot BEFORE the merge, so undo has somewhere to go back to. Written to
+  // localStorage because performing the removal reloads the page.
+  try {
+    localStorage.setItem(UNDO_KEY, JSON.stringify({
+      at: Date.now(),
+      prev: [...hidden].map(([sha16, key]) => ({ sha16, key })),
+    }));
+  } catch (e) {}
   for (const [sha, key] of marks) hidden.set(sha, key);
   marks.clear();
   writeStore(HIDDEN_KEY, hidden);
@@ -316,15 +393,20 @@ bar.onclick = (e) => {
   if (!btn || btn.hidden) return;
   const act = btn.dataset.act || btn.dataset.a;
   if (act === "remove") removeSelected();
+  if (act === "undo") undoLastRemoval();
   if (act === "export") exportRemovals();
   if (act === "restore") {
     hidden.clear();
     exportedCount = 0;
     writeStore(HIDDEN_KEY, hidden);
-    try { localStorage.setItem(EXPORTED_KEY, "0"); } catch (err) {}
-    location.reload();
+    try {
+      localStorage.setItem(EXPORTED_KEY, "0");
+      localStorage.removeItem(UNDO_KEY);
+    } catch (err) {}
+    if (sinkReady) sendToSink(hidden).finally(() => location.reload());
+    else location.reload();
   }
-  if (act === "exit") { exitSelectMode(); render(); }
+  if (act === "exit") { armed = false; exitSelectMode(); render(); }
 };
 
 onSelectionChange((info) => {

@@ -29,6 +29,50 @@
   var cfg = window.GLANCE_CONFIG || {};
   var KEY = "glance-curate-hidden:" + (cfg.collection || "");
 
+  // CURATION EPOCH -- the one lever that can invalidate local curation state on
+  // every device from the server side. A per-device hidden list is otherwise
+  // unreachable: if it is wrong, only whoever holds the phone can fix it.
+  //
+  // Bump this to force every device to drop its hidden list on the next ordinary
+  // load. Bumped to 2 on 2026-08-10, because a long-press selected a whole
+  // cluster and hid 60 cards on Luca's phone, and asking him to find a control
+  // inside a half-empty field is a worse answer than making a normal reload fix
+  // it. Nothing legitimate was lost: the only other hidden entries were two
+  // debug masks already excluded for real by a rebuild, which self-prune anyway.
+  var EPOCH = "2";
+  var EPOCH_KEY = "glance-curate-epoch:" + (cfg.collection || "");
+  try {
+    if (localStorage.getItem(EPOCH_KEY) !== EPOCH) {
+      localStorage.removeItem(KEY);
+      localStorage.removeItem("glance-curate-marks:" + (cfg.collection || ""));
+      localStorage.removeItem("glance-curate-exported:" + (cfg.collection || ""));
+      localStorage.removeItem("glance-curate-undo:" + (cfg.collection || ""));
+      localStorage.setItem(EPOCH_KEY, EPOCH);
+      return;   // fetch untouched: the field builds complete
+    }
+  } catch (e) {
+    // A blocked store just means no epoch tracking; carry on.
+  }
+
+  // ESCAPE HATCH: `?curate=reset` un-hides everything and loads the full field.
+  // Added 2026-08-10 after a long-press selected a whole cluster and 60 cards
+  // were removed in one tap. The in-page `restore` button already did this, but
+  // when a phone is showing half a field the fastest recovery is a link someone
+  // can just tap, not an instruction to find a control inside the broken view.
+  if (/[?&]curate=reset(&|$)/.test(location.search)) {
+    try {
+      localStorage.removeItem(KEY);
+      localStorage.removeItem("glance-curate-marks:" + (cfg.collection || ""));
+      localStorage.removeItem("glance-curate-exported:" + (cfg.collection || ""));
+      localStorage.removeItem("glance-curate-undo:" + (cfg.collection || ""));
+    } catch (e) {}
+    // Drop the parameter so a later reload is a normal load.
+    try {
+      history.replaceState(null, "", location.pathname + location.hash);
+    } catch (e) {}
+    return;   // fetch untouched: the field builds complete
+  }
+
   var hidden = [];
   try {
     hidden = JSON.parse(localStorage.getItem(KEY) || "[]") || [];
