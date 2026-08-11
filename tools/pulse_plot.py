@@ -1,4 +1,15 @@
-"""Draw the sharpness-over-time curve of a render, so the blur pulse is visible.
+"""DEPRECATED 2026-08-11. Use `tools/analyse_render.py`, which supersedes this.
+
+It scales every frame to 448x256 before measuring sharpness, which destroys
+the frequencies it is reporting on, and uses Laplacian variance, which
+chained-diffusion-limits.md itself records as noise-confounded. The
+replacement measures a contrast-normalised FFT high-frequency ratio on a
+native-resolution crop, and reports the TROUGH as well as the swing.
+
+This still runs, and is kept because three skills and two docs reference it. Do
+not build on it.
+
+Draw the sharpness-over-time curve of a render, so the blur pulse is visible.
 
 Frame-average sharpness hides the thing a viewer actually notices: sharpness
 rises at every keyframe and falls between them, so the image breathes in and out

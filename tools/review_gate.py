@@ -21,6 +21,14 @@ does not look. For those the gate falls back to Gemini's SCORES and to native
 edge strips that a person or agent has to actually open. A clip is never passed
 just because the instrument that cannot see a fault failed to see it.
 
+The canvas edge is now MEASURABLE, but only as a within-subject comparison:
+`b_detail` from `slow_interpolation.quality` is monotonic in band width on both
+synthetic bases (-12% at 16px, -63% at 48px, -80% at 96px) and moves -31% on the
+one real same-subject pair we have. It has no absolute threshold and cannot get
+one: across subjects it measures the subject. So pass `--baseline <clip of the
+same subject>` to have it checked, and without a baseline the edge strips stay
+the only answer.
+
     python tools/review_gate.py outputs/.../clip__bc_1728x540.mp4 --subject "a field of flowers"
     python tools/review_gate.py outputs/nyc-billboard/led/led18_*__bc_1728x540.mp4
 
@@ -41,6 +49,17 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _quality():
+    """Load quality.py directly; the package __init__ drags in torch."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "si_quality", ROOT / "src" / "slow_interpolation" / "quality.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
 OUT = ROOT / "review-gate.json"
 
 # Thresholds. Each is a MULTIPLE of the clip's own median, so a clip is judged
@@ -250,7 +269,10 @@ def measure(path: Path):
                 sharp=np.array(sharp), step=np.array(step))
 
 
-def gate(path: Path, subject: str) -> dict:
+BORDER_DROP = 0.15     # b_detail fall vs a same-subject baseline that counts as an edge
+
+
+def gate(path: Path, subject: str, baseline: dict | None = None) -> dict:
     g = vote(path, subject)
     m = measure(path)
     fps, sharp, step = m["fps"], m["sharp"], m["step"]
@@ -301,6 +323,17 @@ def gate(path: Path, subject: str) -> dict:
 
     strips = edge_strips(path, m["w"], m["h"])
 
+    # Measured border check, only possible against a same-subject baseline.
+    if baseline and baseline.get("b_detail"):
+        mine = _quality().features(path, K=10, limit=150)
+        drop = (baseline["b_detail"] - mine["b_detail"]) / abs(baseline["b_detail"])
+        checked.append({"t": 0, "kind": "border", "scope": "clip",
+                        "note": f"b_detail {mine['b_detail']:.3f} vs baseline "
+                                f"{baseline['b_detail']:.3f}, {drop:+.0%}",
+                        "measured": round(drop, 3), "confirmed": drop > BORDER_DROP})
+        if drop > BORDER_DROP:
+            verdict.append(f"border(b_detail {drop:+.0%})")
+
     # Gemini's own scores are a gate in their own right, because the fault it
     # reports most (rubbery morphing) is invisible to every metric here.
     for axis in ("subject", "loop", "motion", "image"):
@@ -329,13 +362,19 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("videos", nargs="+")
     ap.add_argument("--subject", default="")
+    ap.add_argument("--baseline", help="a clip of the SAME subject; enables the "
+                                       "measured border check")
     a = ap.parse_args()
+    baseline = None
+    if a.baseline:
+        baseline = _quality().features(Path(a.baseline), K=10, limit=150)
+        print(f"border baseline: {baseline['clip']}  b_detail {baseline['b_detail']:.3f}")
     results, failed = [], 0
     for v in a.videos:
         p = Path(v)
         if not p.exists():
             print(f"MISSING {p}"); failed += 1; continue
-        r = gate(p, a.subject)
+        r = gate(p, a.subject, baseline)
         results.append(r)
         s = r["scores"]
         tag = "PASS" if r["pass"] else "FAIL"

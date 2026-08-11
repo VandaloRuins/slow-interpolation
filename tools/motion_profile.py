@@ -1,4 +1,14 @@
-"""Per-frame motion profile of a render. Finds speed spikes and broken loops.
+"""DEPRECATED 2026-08-11. Use `tools/analyse_render.py`, which supersedes this.
+
+Its per-frame delta cannot separate a light change from a movement, and this
+pipeline's whole subject is a light change. The replacement measures optical
+flow, and adds the keyframe-crossing lurch and decimation jitter that a
+single delta curve averages away.
+
+This still runs, and is kept because three skills and two docs reference it. Do
+not build on it.
+
+Per-frame motion profile of a render. Finds speed spikes and broken loops.
 
 Why this exists: `analyse_ladder.py` samples 9 frames across 384 and reports a
 `loop` ratio from them. That can never see a single-frame discontinuity, so it
