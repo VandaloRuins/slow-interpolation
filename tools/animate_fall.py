@@ -150,8 +150,26 @@ def main() -> int:
                          "by this fraction; frozen grain on moving water reads as a "
                          "dirty window in front of the fall")
     ap.add_argument("--cycles", type=int, default=1,
-                    help="full texture traversals per loop; must stay an integer "
+                    help="full texture traversals per loop (mode=cycle) or wave "
+                         "periods per loop (mode=oscillate); must stay an integer "
                          "or the wrap seam returns")
+    ap.add_argument("--mode", choices=["cycle", "oscillate"], default="cycle",
+                    help="cycle: texture traverses its run continuously, for a fall. "
+                         "oscillate: it advances and recedes on a sine, for waves on "
+                         "a shore. A sine is zero at both ends of the loop, so closure "
+                         "holds for any integer --cycles, and its zero velocity at the "
+                         "extremes is right: swash does pause before it drains")
+    ap.add_argument("--amplitude", type=float, default=0.10,
+                    help="oscillate only: peak excursion as a fraction of each "
+                         "column's own masked run. A wave travels a short way and "
+                         "returns, so this is small where --cycles is a full traversal")
+    ap.add_argument("--perspective", type=float, default=0.0,
+                    help="oscillate only, 0 to 1: scale the excursion by depth so near "
+                         "water moves further than far water. At 0 the whole bay slides "
+                         "rigidly, which reads wrong under perspective. Above 0 the "
+                         "shift varies along the run, so the band stretches and "
+                         "compresses rather than rolling; that IS what swash does, but "
+                         "it resamples unevenly, so judge it by eye against 0")
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
 
@@ -200,10 +218,30 @@ def main() -> int:
         hi = np.asarray(img.filter(ImageFilter.GaussianBlur(args.band_hi)), np.float32)
         band = lo - hi
         fine = a - lo          # static grain finer than the moving band
-        # shift = round(n * m / N) per pixel via its column's run length:
-        # every column completes exactly `cycles` full cycles over the loop.
-        shift = (i * args.cycles * m_col) // n
-        src_rank = (rank - shift) % np.maximum(m_col, 1)
+        if args.mode == "cycle":
+            # shift = round(n * m / N) per pixel via its column's run length:
+            # every column completes exactly `cycles` full cycles over the loop.
+            shift = (i * args.cycles * m_col) // n
+        else:
+            # Waves: the excursion follows a sine, so the texture runs up the
+            # shore and drains back. sin is 0 at i=0 and at i=n for integer
+            # `cycles`, so the loop closes per column exactly as the roll does.
+            phase = 2.0 * np.pi * args.cycles * i / n
+            scale = args.amplitude * np.sin(phase)
+            if args.perspective:
+                depth = rank / np.maximum(m_col, 1)      # 0 far, 1 near
+                scale = scale * ((1.0 - args.perspective) + args.perspective * depth)
+            shift = np.rint(scale * m_col).astype(np.int64)
+        if args.mode == "cycle":
+            src_rank = (rank - shift) % np.maximum(m_col, 1)
+        else:
+            # CLAMP, do not wrap. Wrapping is right for a fall, where water
+            # leaving the bottom genuinely re-enters at the top. On an
+            # oscillation it drags content across the whole run at both ends,
+            # which printed as three hard crescents in the slit-scan, one per
+            # wave period. Clamping smears the last pixel instead, which is
+            # what water piling against the top of its swash looks like.
+            src_rank = np.clip(rank - shift, 0, np.maximum(m_col - 1, 0))
         src_flat = flat[col_start[xs] + src_rank]
         band2 = band.reshape(-1, 3)
         moved = band2[src_flat]
@@ -218,8 +256,14 @@ def main() -> int:
     out = args.out or args.src.with_name(args.src.stem + "_flow.mp4")
     write_frames(out_frames, fps, out)
     print(f"wrote       : {out}")
-    print(f"loop        : every column completes exactly {args.cycles} cycle(s) of its "
-          f"own masked run over {n} frames; closure is per column by construction")
+    if args.mode == "cycle":
+        print(f"loop        : every column completes exactly {args.cycles} cycle(s) of "
+              f"its own masked run over {n} frames; closure is per column by construction")
+    else:
+        print(f"loop        : {args.cycles} wave period(s) over {n} frames, peak "
+              f"excursion {args.amplitude:.0%} of each column's run"
+              f"{f', perspective {args.perspective:.0%}' if args.perspective else ''}; "
+              f"the sine is zero at both ends, so closure is exact per column")
     return 0
 
 

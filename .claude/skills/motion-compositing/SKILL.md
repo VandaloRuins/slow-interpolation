@@ -38,6 +38,39 @@ strength does not help; the issue is what DETERMINES the repaint, not how much r
 4. `--gain` ~1.5 and `--damp-fine` ~0.5: measured at gain 1.0 the moved band correlates
    0.60 vs the static grain's 0.91, so the eye locks onto what does not move.
 
+## Waves: `--mode oscillate`
+
+A fall traverses; a wave advances and returns. Same masked-run machinery, but the shift
+follows `A * sin(2 pi * cycles * i / n)` instead of a ramp. A sine is zero at both ends
+of the loop, so closure holds for any integer `--cycles`, and its zero velocity at the
+extremes is correct rather than a compromise: swash does pause before it drains.
+
+**Clamp at the run ends, never wrap.** This is the one real trap. Wrapping is right for a
+fall, where water leaving the bottom genuinely re-enters at the top. On an oscillation it
+drags content across the entire run at both ends, and it printed as **three hard
+crescents in the slit-scan, one per wave period**. `np.clip` instead of `% m` smears the
+edge pixel, which is what water piling against the top of its swash looks like.
+
+**Size the excursion against the measured run, not by feel.** `--amplitude` is a fraction
+of each column's own masked run, so its pixel value depends entirely on the mask. On
+`led13_b_realloc_soft` the foam mask is 4.3% of frame with a median run of 93 px, so 0.10
+is only 9 px. Measure the run first:
+
+```python
+runs = (mask > 0.5).sum(axis=0); nz = runs[runs > 0]   # median, p90, max
+```
+
+**`--perspective` trades physics for resampling.** At 0 the whole water body slides
+rigidly, which reads wrong under perspective; above 0 the shift varies along the run so
+near water travels further, which is what swash does, but it stretches rather than rolls
+and resamples unevenly. Generate both and judge by eye.
+
+**Get the loop-seam control before calling a seam a regression.** The composited clip
+measured a seam 4.44x the adjacent-frame step, against the fall's documented 1.4x, which
+looks like a bad regression. The SOURCE clip measured **4.77x** on the same column: the
+seam was the underlying render's and compositing slightly improved it. The 1.4x benchmark
+belongs to a different clip and is not a threshold.
+
 Config side: **`skip_boundary: 0` for any motion clip** (it inserts a positional jump of
 ~`2*skip/2^passes` of the step at every keyframe), which is the OPPOSITE of the
 light-drift tuning; the two cannot share a preset. Static regions cost nothing: flow is
