@@ -627,6 +627,121 @@ def build_wide_depth(w: int, h: int, stage: str = "savage",
     return img.filter(ImageFilter.GaussianBlur(4))
 
 
+def break_ledge(img: Image.Image, *, crest_lo: int = 640, crest_hi: int = 760,
+                fade_to: int = 850, notches: tuple[int, ...] = (487, 905, 176),
+                seed: int = 1087) -> Image.Image:
+    """Give a near shelf no flat standing surface, leaving the rest byte-identical.
+
+    Authored 2026-08-10 for PL12. `led2-c-desolation.png`'s near shore is a
+    perfectly level plane: its crest sits within 13 rows across 1248 columns and
+    at row 760 every column is exactly 219. A depth map like that is a stage,
+    and a Cole LoRA under a moon puts a staffage figure on a stage. It did, at
+    x=487, and the figure survived both a negative ban and a positive one
+    (PL11), so the prompt side is closed and only geometry is left.
+
+    Three coordinated edits, all inside the shelf:
+
+    - **A triangular crest.** Peaked teeth of irregular period, not a wave: a
+      sinusoid blurs back into a plateau, a point cannot. Zero-mean, so the
+      shelf's mass and its average height are unchanged.
+    - **Notches** cut to the bay's own black, one of them centred on the spot
+      the figure chose. A notch is not a worse surface, it is no surface.
+    - **Lateral tilt.** The shelf's value gains a zero-mean sawtooth in x, so a
+      horizontal cut across it crosses several depths instead of one. In a
+      depth map that is a slab rotated out of level, which is the difference
+      between rock and floor. It fades out by `fade_to`, below the delivered
+      crop, so the undelivered lower shelf keeps its smooth recession.
+
+    Operates on the PNG rather than redrawing it, deliberately: this map does
+    not reproduce from `build_wide_depth`, so a redraw would quietly move the
+    crag and the far shore, and PL12 is only attributable if they hold.
+    """
+    a = np.asarray(img.convert("RGB"), dtype=np.float32)
+    h, w, _ = a.shape
+    rng = np.random.default_rng(seed)
+    x = np.arange(w, dtype=np.float32)
+    lum = a[..., 0]
+
+    # Crest per column, searched from `crest_lo` DOWN. Searching from the top
+    # instead finds the far-shore stumps (value 112) and the crag (246), whose
+    # columns would then have their bodies rebuilt as shelf. The crag is a
+    # shared element and must hold.
+    below = lum[crest_lo:] > 100
+    crest = np.where(below.any(axis=0), below.argmax(axis=0) + crest_lo, h).astype(np.float32)
+    shelf_col = (crest > crest_lo + 8) & (crest < h - 8)   # crag columns are excluded:
+    shelf_col &= lum[crest_lo] <= 100                      # they are already bright at crest_lo
+
+    # Teeth: three incommensurate triangle waves, so no period repeats inside
+    # the frame and no two adjacent peaks sit at the same height. Triangles,
+    # not sinusoids: a sinusoid's crest blurs back into a plateau under the
+    # map's own softening, and a plateau is the thing being removed.
+    def tri(period: float, phase: float) -> np.ndarray:
+        t = np.mod(x / period + phase, 1.0)
+        return 4.0 * np.abs(t - 0.5) - 1.0
+
+    # Long periods on purpose. At 137 px the crest became a dozen small forms,
+    # which is the "twelve slender towers" the chain provably cannot keep
+    # consistent; v9's five broad masses scored the best image of that run. Two
+    # waves at 341 and 211 give about six wedges across the width.
+    teeth = 22.0 * tri(341.0, rng.random()) + 13.0 * tri(211.0, rng.random())
+    teeth -= teeth.mean()
+
+    # Notches, cut from the crest downward into the shelf.
+    notch = np.zeros(w, dtype=np.float32)
+    for cx, half, depth in zip(notches, (24, 19, 29), (118.0, 94.0, 132.0)):
+        d = np.abs(x - cx)
+        notch = np.maximum(notch, np.where(d < half, depth * (1.0 - (d / half) ** 2), 0.0))
+
+    # Taper to nothing at the end of EVERY contiguous shelf run, not just the
+    # first and last. The crag's foot splits the shelf in two, and a single
+    # taper left the 32-column sliver to its right starting at amplitude 0.39,
+    # i.e. a vertical seam inside the delivered width.
+    amp = np.zeros(w, dtype=np.float32)
+    edges_ = np.flatnonzero(np.diff(np.r_[False, shelf_col, False].astype(np.int8)))
+    for lo_, hi_ in zip(edges_[0::2], edges_[1::2]):
+        seg = x[lo_:hi_]
+        ramp = np.minimum((seg - lo_) / 80.0, (hi_ - 1 - seg) / 80.0)
+        amp[lo_:hi_] = np.clip(ramp, 0.0, 1.0)
+    delta = (teeth + notch) * amp
+
+    # Displace each shelf column by `delta` rows rather than rebuilding it, so
+    # the column keeps its own recession exactly and the only mass that moves
+    # is what a tooth or a notch actually costs. Teeth are zero-mean, so what
+    # one column gives up the next takes back.
+    yy = np.arange(h, dtype=np.float32)[:, None]
+    src = np.clip(yy - delta[None, :], 0, h - 1)
+    lo = np.floor(src).astype(np.int32)
+    hi = np.clip(lo + 1, 0, h - 1)
+    frac = src - lo
+    cols = np.arange(w)[None, :]
+    shifted = lum[lo, cols] * (1.0 - frac) + lum[hi, cols] * frac
+    # Rows the shelf vacated become bay, and the bay is black on purpose: any
+    # grey there reads to the model as a surface (control-map skill).
+    shifted = np.where(yy < crest[None, :] + delta[None, :], 0.0, shifted)
+
+    # Lateral tilt: five slabs, each running to a different side, so a
+    # horizontal cut crosses several depths instead of one. Strongest at the
+    # crest, gone by `fade_to`, which sits below the delivered crop.
+    edges = np.linspace(0, w, 6)
+    tilt = np.zeros(w, dtype=np.float32)
+    for i in range(5):
+        m = (x >= edges[i]) & (x < edges[i + 1])
+        ramp = (x - edges[i]) / (edges[i + 1] - edges[i]) - 0.5
+        tilt = np.where(m, ramp * (26.0 if i % 2 == 0 else -22.0), tilt)
+    tilt = (tilt - tilt.mean()) * amp
+    falloff = np.clip((fade_to - yy) / max(1.0, fade_to - crest_hi), 0.0, 1.0)
+    shifted = np.where(shifted > 8.0, shifted + tilt[None, :] * falloff, shifted)
+
+    band = (yy >= crest_lo) & shelf_col[None, :]
+    out = np.where(band, np.clip(shifted, 0.0, 255.0), lum)
+    smooth = np.asarray(Image.fromarray(out.astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(3)), dtype=np.float32)
+    # Blur only what was edited. `delta` tapers to zero at the shelf's ends, so
+    # restoring everything else costs no seam and keeps the crag byte-identical.
+    out = np.where(band, smooth, lum)
+    return Image.fromarray(np.repeat(out.astype(np.uint8)[..., None], 3, axis=2))
+
+
 def soften(img: Image.Image, radius: int) -> Image.Image:
     """Blur the map hard, and break the flat fills with a faint gradient.
 
@@ -668,10 +783,25 @@ def main() -> int:
                          "per-keyframe control animation; --out is the stem")
     ap.add_argument("--soften", type=int, default=0,
                     help="extra blur radius; use ~14 to stop ControlNet tracing edges")
+    ap.add_argument("--break-ledge", type=Path, default=None,
+                    help="read an existing map and give its near shelf no flat "
+                         "standing surface; everything above the shelf is left "
+                         "byte-identical. Writes to --out")
+    ap.add_argument("--notches", type=str, default="487,905,176",
+                    help="--break-ledge only: comma-separated x centres to cut "
+                         "out of the crest. Put one where the figure stood")
     ap.add_argument("--width", type=int, default=1344)
     ap.add_argument("--height", type=int, default=768)
     args = ap.parse_args()
     args.out.parent.mkdir(parents=True, exist_ok=True)
+    if args.break_ledge:
+        src = Image.open(args.break_ledge)
+        out = break_ledge(src, notches=tuple(int(v) for v in args.notches.split(",")))
+        if args.soften:
+            out = soften(out, args.soften)
+        out.save(args.out)
+        print(f"broke the ledge of {args.break_ledge} -> {args.out}")
+        return 0
     if args.stage:
         out = build_stage_depth(args.width, args.height, args.stage,
                                 liberty=not args.no_liberty, crag_cx=args.crag_cx,

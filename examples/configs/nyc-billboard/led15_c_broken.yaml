@@ -1,0 +1,132 @@
+# LED wall, screen C. 1728 x 540, 16:5, 10.000 s, 30 fps.  SIXTH PASS.  PL12.
+#
+# KILL THE FIGURE WITH GEOMETRY, BECAUSE THE PROMPT SIDE IS CLOSED.
+# led12_c and led13_c both painted an unprompted standing figure on the near
+# ledge at the luminance peak. PL11 then closed both prompt-side routes at
+# guidance 1.5: banning it in the NEGATIVE left it present (negatives are
+# weight-starved at 1.5), and putting "no people" in the POSITIVE left it
+# present and MORE prominent. Raising guidance to 3.0 does remove it, but it
+# activates the whole negative list at once and costs 25% of the luminance,
+# which is the thing this screen is for.
+#
+# So the only lever left is the map, and the map turned out to be the cause
+# rather than a bystander. `led2-c-desolation.png`'s near shore is a PERFECTLY
+# LEVEL PLANE: its crest sits within 13 rows across 1248 columns, and at row
+# 760 every single column is exactly 219. In depth terms that is a stage. Cole
+# painted staffage on foreground ledges all his life, and the LoRA was handed
+# a lit, level, empty one.
+#
+# `tools/make_massing.py --break-ledge` rewrites ONLY that shelf: about six
+# broad wedges instead of one plane (few large masses, not the twelve small
+# ones the chain cannot hold), three notches cut to black with one centred on
+# x=487 where the figure actually stood, and a lateral tilt so a horizontal cut
+# crosses several depths instead of one. Rows 0 to 639 are BYTE-IDENTICAL, so
+# the crag, the far shore strip and the ruined columns are untouched and the
+# result attributes to the ledge alone.
+#
+# Map stats, against led2-c-desolation: mean 62.8 -> 59.3, black 60.7 -> 63.6%,
+# near 21.4% (was 22.4%). Black and near are inside the known-good band; the
+# mean is 3.4 low and that is the notches, which is the intended cost of
+# removing surface. Teeth alone measure 61.4, i.e. near mass-neutral by design.
+#
+# EVERY OTHER DIAL IS HELD AT led13_c_realloc_soft, including the now-known-
+# inert `people, figures, a standing figure` negative: dropping it would be a
+# second variable, and PL11 already showed it does nothing either way.
+#
+#     python tools/conform.py --screen bc --crop-y 288 --src <render>.mp4
+
+seed: 1087
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome, golden hour, sunset, warm light, daylight, fire, foliage, people, figures, a standing figure"
+
+subject:
+  name: led13_c_realloc_soft
+  # Byte-identical to led3 / led12. Only the light phrase moves.
+  prompts:
+    - label: "A: starless black night, faint cold light"
+      prompt: >-
+        starless black night, faint cold light, a tall rocky crag on a shore in
+        the foreground, still black water, broken ruined columns on a low shore
+        far across the water
+    - label: "B: full moonlight, silver on the water"
+      prompt: >-
+        full moonlight, silver on the water, a tall rocky crag on a shore in the
+        foreground, still black water, broken ruined columns on a low shore far
+        across the water
+    - label: "A (return)"
+      prompt: >-
+        starless black night, faint cold light, a tall rocky crag on a shore in
+        the foreground, still black water, broken ruined columns on a low shore
+        far across the water
+
+resolution:
+  width: 1536
+  height: 896
+
+# K = (1+1) + (3+2) + 1 = 8, the same as led12. raw = 8 * 55 - 1 = 439.
+frames:
+  steady: 2
+  steady_per_segment: [1, 3]
+  transition: 1
+  return_: 2
+  warmup: 3
+
+render:
+  structural_decay_radius: 1
+  # Lowered. At 20 steps: 10 / 10 / 10 real steps.
+  steady_strengths: [0.52, 0.54, 0.52, 0.54, 0.52, 0.54, 0.52, 0.54]
+  transition_strength: 0.56
+  return_strength_start: 0.52
+  return_strength_end: 0.46
+  return_pixel_blend_max: 0.45
+
+sampling:
+  num_inference_steps: 20
+  guidance_scale: 1.5
+
+control:
+  model: diffusers/controlnet-depth-sdxl-1.0
+  image: outputs/_anchors/led2-c-desolation-broken.png
+  scale: 0.65
+  guidance_start: 0.0
+  guidance_end: 0.6
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 8
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_name: led15_c_broken
+output_dir: outputs/nyc-billboard/led

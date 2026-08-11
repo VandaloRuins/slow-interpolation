@@ -1,0 +1,114 @@
+# LED wall, screen C.  PL9: DOES A SEEDED RENDER REPRODUCE RUN TO RUN.
+#
+# This is `led13_c_realloc_soft.yaml` with ONE line added, `output_name`, which
+# feeds nothing but the filename (`pipeline.py:47`). Same seed, same map, same
+# prompts, same schedule, same GPU tier. The question is the last open half of
+# PL9.
+#
+# The first half is answered: led12's warmup anchor against led3's correlates
+# r = 0.979 / 0.948, which rules out an unseeded canvas, so the seed DOES take.
+# But only 0.2% of pixels are byte-identical, consistent with GPU kernel
+# nondeterminism amplified through ~47 sequential warmup steps.
+#
+# So VERIFY BY CORRELATION, NEVER BY CHECKSUM. A hash will differ and prove
+# nothing. Correlate frame 0 and frame 150 of this render against
+# led13_c_realloc_soft.mp4; r near 0.98 means the seed reproduces the painting
+# and the residual is kernel noise.
+#
+#     python tools/conform.py --screen bc --crop-y 288 --src <render>.mp4
+
+seed: 1087
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome, golden hour, sunset, warm light, daylight, fire, foliage, people, figures, a standing figure"
+
+subject:
+  name: led13_c_realloc_soft
+  # Byte-identical to led3 / led12. Only the light phrase moves.
+  prompts:
+    - label: "A: starless black night, faint cold light"
+      prompt: >-
+        starless black night, faint cold light, a tall rocky crag on a shore in
+        the foreground, still black water, broken ruined columns on a low shore
+        far across the water
+    - label: "B: full moonlight, silver on the water"
+      prompt: >-
+        full moonlight, silver on the water, a tall rocky crag on a shore in the
+        foreground, still black water, broken ruined columns on a low shore far
+        across the water
+    - label: "A (return)"
+      prompt: >-
+        starless black night, faint cold light, a tall rocky crag on a shore in
+        the foreground, still black water, broken ruined columns on a low shore
+        far across the water
+
+resolution:
+  width: 1536
+  height: 896
+
+# K = (1+1) + (3+2) + 1 = 8, the same as led12. raw = 8 * 55 - 1 = 439.
+frames:
+  steady: 2
+  steady_per_segment: [1, 3]
+  transition: 1
+  return_: 2
+  warmup: 3
+
+render:
+  structural_decay_radius: 1
+  # Lowered. At 20 steps: 10 / 10 / 10 real steps.
+  steady_strengths: [0.52, 0.54, 0.52, 0.54, 0.52, 0.54, 0.52, 0.54]
+  transition_strength: 0.56
+  return_strength_start: 0.52
+  return_strength_end: 0.46
+  return_pixel_blend_max: 0.45
+
+sampling:
+  num_inference_steps: 20
+  guidance_scale: 1.5
+
+control:
+  model: diffusers/controlnet-depth-sdxl-1.0
+  image: outputs/_anchors/led2-c-desolation.png
+  scale: 0.65
+  guidance_start: 0.0
+  guidance_end: 0.6
+
+rife:
+  passes: 6
+  skip_boundary: 4
+  edge_crop: 8
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_name: led15_c_repro
+output_dir: outputs/nyc-billboard/led

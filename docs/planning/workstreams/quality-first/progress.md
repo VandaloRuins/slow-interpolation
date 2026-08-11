@@ -788,6 +788,88 @@ Same open question applies to `docs/manual/train-lora-on-modal.md:114` ("aggress
 fight stylistic LoRAs"), which may be unaffected if validation runs at a different guidance.
 Check the guidance there before touching it.
 
+### L25. PL12 answered: the map was the CAUSE of the figure, not a bystander
+
+`led15_c_broken`, $0.042, every dial held at `led13_c_realloc_soft` except
+`control.image`.
+
+The diagnosis is the result. `led2-c-desolation.png`'s near shore is a
+**perfectly level plane**: its crest sits within 13 rows across 1248 columns,
+and at row 760 every single column is exactly 219. In depth terms that is a
+lit, empty stage, and Cole painted staffage on foreground ledges all his life.
+The map was not permitting the figure, it was inviting it.
+
+`tools/make_massing.py --break-ledge` rewrites only that shelf: about six broad
+wedges instead of one plane, three notches cut to black with one centred on
+x=487 where the figure actually stood, and a lateral tilt so a horizontal cut
+crosses several depths. Rows 0 to 639 are byte-identical, so the crag, the far
+shore and the ruined columns are untouched and the result attributes to the
+ledge alone.
+
+| | control | led15_c_broken |
+|---|---|---|
+| standing figure | present at the peak | **gone, at every frame checked** |
+| mean luminance, delivered crop | 50.26 | **52.23** (+3.9%) |
+| arc swing | 9.93 | **10.29** |
+| HF energy | 100% | 97% |
+| loop delta | 0.97 | 1.24 |
+
+**Compare the cost of the only other lever that works.** Guidance 3.0 removed
+the same figure for 25% of the luminance and 155% of control's HF energy.
+Geometry removed it while getting slightly BRIGHTER and slightly wider in the
+arc. The palette was the thing this screen is for, so this is the route.
+
+**Judge the composition, not just the defect.** The wedges read as broken
+columnar blocks, so the "ruined columns" the prompt puts *far across the water*
+now also stand in the foreground. On-concept for Desolation, arguably, but it
+is a real compositional change and it is Luca's call, not a metric's.
+
+**First bisect if it is wanted:** teeth, notches and tilt shipped together as
+one intervention. Teeth alone measure near mass-neutral (map mean 61.4 against
+the original 62.8), so notches-only is the cheap next probe.
+
+**Two mechanics worth not rediscovering.** `outputs/_anchors/` is NOT in any
+Modal mount; the maps live on the `slow-interp-outputs` volume. A new map needs
+`modal volume put` first or the render dies on a bare `FileNotFoundError`
+*after* the container has spun up. And `output_name` overrides the render
+filename while feeding nothing else (`pipeline.py:47`), which is what makes a
+byte-identical rerun possible.
+
+### L26. PL9 answered in full, and it hands the workstream a NOISE FLOOR
+
+`led15_c_repro` is `led13_c_realloc_soft` with one line added, `output_name`.
+Same seed, same map, same schedule, same tier.
+
+| frame | % of loop | raw r | composition r (sigma 12) |
+|---|---|---|---|
+| 0 | 0% | 0.927 | **0.980** |
+| 120 | 40% | 0.847 | 0.928 |
+| 150 | 50% | 0.852 | **0.922** |
+| 186 | 62% | 0.846 | 0.930 |
+| 260 | 87% | 0.921 | 0.980 |
+| 299 | 100% | 0.932 | 0.982 |
+
+**The seed takes and determinism does not**, confirming L23 on the finished
+render rather than on the warmup anchor. But the new fact is the SHAPE:
+divergence is smallest at the loop ends, where warmup and the return pin the
+image, and largest at the midpoint, which is furthest from both. Kernel
+nondeterminism accumulating with chain depth, then pulled back by loop closure.
+
+**The consequence is a measurement rule the whole board needs.** Re-running the
+SAME config gives composition r ~0.92 at mid-loop. So a frame-matched
+composition r of 0.92 or better between two DIFFERENT configs is inside the
+noise floor and attributes to nothing. Any A/B claim on this pipeline has to
+clear that bar first.
+
+**Arc metrics are far safer than frame-matched ones**, which is why the light
+work stands: control against its own rerun differs by 0.15 on swing (9.93 vs
+10.08) and 0.3 on min. The arc results in L22 are 3 to 4 units, i.e. an order
+of magnitude above the floor.
+
+**The 62% peak survived a third lever.** Control 62.6%, rerun 62.6%, broken map
+63.6%. Neither frame allocation nor the control map moves it. It is the first
+return keyframe, and it is structural.
+
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 
 - **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,
