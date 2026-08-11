@@ -55,7 +55,30 @@ The build dir is wiped on every run, so a `.vercel/` link inside it cannot survi
 **Originals are 11.5 GB and are never deployed.** Only the small proxies `gallery.py`
 already built get shipped, under a 4 MB per-file cap and a 95 MB bundle budget. Today
 that is 59 of 209 videos. The rest keep poster and full record and say "video not
-published in this archive" — which is true, and is not a bug to chase.
+published in this archive", which is true **of the Vercel bundle** and is not a bug to
+chase there.
+
+**It IS a bug on the local tunnel, and it was one.** Both limits exist because Vercel
+has to hold the bundle; neither applies to a file read off this machine's own disk. On
+2026-08-10 the served field showed that banner on 50 of 118 cards while every file sat
+locally. `serve_glance.py` now patches `media_url` into the catalogue RESPONSE for
+anything it can play, proxy first and original as fallback, so the tunnel plays
+everything while the deployed bundle stays inside budget. Same trick as the curate shim:
+modify the response, never the built JSON.
+
+**Serve video with byte-range support or iOS will not play it.**
+`SimpleHTTPRequestHandler` ignores `Range` and answers **200 with the whole file**.
+Safari opens a video with a range probe and reads a 200 as "this server cannot seek", so
+playback is unreliable and scrubbing impossible, including on proxies that shipped
+correctly. Fixed in `serve_glance.py` for both routes: 206, `Content-Range`,
+`Accept-Ranges`, and tail ranges (`bytes=-4096`), which is how a player finds the `moov`
+atom. Verify with `curl -D - -o /dev/null -H "Range: bytes=0-1023"` and assert on **206**,
+never on 200.
+
+**A server restart does not cost the curator their work.** The curation epoch is a
+hardcoded constant in `glance_curate_hide.js`, not a per-build value, so rebuilding and
+restarting leaves every device's hidden list intact. Check that before touching a server
+mid-pass; bumping the epoch is the one thing that would wipe it.
 
 **`media_url` must name only what actually shipped.** `glance_export.py` writes it
 pointing at local originals; `glance_deploy.py` REWRITES it to the bundled proxy and

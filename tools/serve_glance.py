@@ -35,20 +35,47 @@ from __future__ import annotations
 import argparse
 import http.server
 import json
+import mimetypes
 import re
 import socket
 import socketserver
+import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ROOT = ROOT / "outputs" / "_glance-ledwall-deploy"
 INBOX = ROOT / "outputs" / "_glance-inbox"
+ORIGINALS = ROOT / "outputs"
+PREVIEWS = ROOT / "outputs" / "_gallery" / "previews"
 
 SINK_PATH = "/curate/removals"
+LOCAL_MEDIA = "/local-media/"
 MAX_BODY = 256 * 1024          # a removal list is a few KB; this is generous
 MAX_ENTRIES = 2000
 SHA16 = re.compile(r"^[0-9a-f]{16}$")
+RANGE_RE = re.compile(r"^bytes=(\d*)-(\d*)$")
+
+
+def local_media_for(key: str) -> Path | None:
+    """The best local file for a catalogue key: small proxy first, else original.
+
+    `glance_deploy.py` withholds media for two reasons that are both about
+    VERCEL: a 4 MB per-file cap and a 95 MB bundle budget. Neither applies to a
+    file being read off this machine's own disk, so served from here the field
+    can play everything it has. On 2026-08-10 that was 50 of 118 cards showing
+    "video not published in this archive" on a local tunnel, which is true of
+    the Vercel bundle and misleading here.
+    """
+    proxy = PREVIEWS / (key.replace("/", "__").rsplit(".", 1)[0] + ".mp4")
+    if proxy.is_file():
+        return proxy
+    original = ORIGINALS / key
+    try:
+        original.relative_to(ORIGINALS)
+    except ValueError:
+        return None
+    return original if original.is_file() else None
 
 
 def validate(doc: object) -> tuple[list[dict], str | None]:
@@ -111,12 +138,114 @@ def make_handler(root: Path, token: str | None):
                 return True
             return f"t={token}" in (self.path.split("?", 1)[1] if "?" in self.path else "")
 
+        def _serve_file(self, path: Path) -> None:
+            """Send a file, honouring Range. iOS will not play video without it.
+
+            `SimpleHTTPRequestHandler` ignores `Range` and answers 200 with the
+            whole body. Safari on iPhone opens a video with a range probe and
+            treats a 200 as "this server cannot seek", so playback is unreliable
+            and scrubbing is impossible. Measured 2026-08-10: the live server
+            returned 200 to `Range: bytes=0-1023`, which is the exact shape the
+            project's own verification rule warns about.
+            """
+            try:
+                size = path.stat().st_size
+            except OSError:
+                return self.send_error(404, "no such media")
+            ctype = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+            start, end = 0, size - 1
+            partial = False
+            m = RANGE_RE.match(self.headers.get("Range", "") or "")
+            if m and size:
+                lo, hi = m.group(1), m.group(2)
+                if lo:
+                    start = int(lo)
+                    if hi:
+                        end = min(int(hi), size - 1)
+                elif hi:                       # bytes=-N is the LAST n bytes
+                    start = max(0, size - int(hi))
+                if start > end or start >= size:
+                    self.send_response(416)
+                    self.send_header("Content-Range", f"bytes */{size}")
+                    self.end_headers()
+                    return
+                partial = True
+
+            self.send_response(206 if partial else 200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Content-Length", str(end - start + 1))
+            if partial:
+                self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+            self.end_headers()
+            if self.command == "HEAD":
+                return
+            remaining = end - start + 1
+            with path.open("rb") as fh:
+                fh.seek(start)
+                while remaining > 0:
+                    chunk = fh.read(min(256 * 1024, remaining))
+                    if not chunk:
+                        break
+                    try:
+                        self.wfile.write(chunk)
+                    except (BrokenPipeError, ConnectionResetError):
+                        return          # the phone seeked away; not an error
+                    remaining -= len(chunk)
+
+        def _patched_catalogue(self, path: Path) -> None:
+            """Fill in `media_url` for anything this machine can actually play."""
+            doc = json.loads(path.read_text(encoding="utf-8"))
+            added = 0
+            for a in doc.get("assets", []):
+                if a.get("media_url"):
+                    continue
+                key = a.get("key") or ""
+                if local_media_for(key):
+                    a["media_url"] = LOCAL_MEDIA.lstrip("/") + urllib.parse.quote(key)
+                    added += 1
+            body = json.dumps(doc).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            if added:
+                print(f"  catalogue: +{added} local media_url (not in the Vercel bundle)")
+
+        def do_HEAD(self):  # noqa: N802
+            # Players probe with HEAD before ranging. Only our own routes need
+            # the override; everything else keeps the stock behaviour.
+            raw = self.path.split("?", 1)[0]
+            if raw.startswith(LOCAL_MEDIA) or raw.endswith(".mp4"):
+                return self.do_GET()
+            return super().do_HEAD()
+
         def do_GET(self):  # noqa: N802
+            raw = self.path.split("?", 1)[0]
             # The curate face probes this to discover whether a sink exists. On
             # Vercel it 404s and the face falls back to manual export, so the
             # same build works in both places with no configuration.
-            if self.path.split("?", 1)[0] == SINK_PATH:
+            if raw == SINK_PATH:
                 return self._json(200, {"sink": "ok", "writes_to": str(INBOX)})
+            if raw.startswith(LOCAL_MEDIA):
+                key = urllib.parse.unquote(raw[len(LOCAL_MEDIA):])
+                if "\\" in key or ".." in key or key.startswith("/"):
+                    return self.send_error(403, "bad key")
+                target = local_media_for(key)
+                if not target:
+                    return self.send_error(404, "no local media for that key")
+                return self._serve_file(target)
+            if raw == "/data/catalogue.json":
+                cat = root / "data" / "catalogue.json"
+                if cat.is_file():
+                    return self._patched_catalogue(cat)
+            # Range for the bundled proxies too, so seeking works on those.
+            if raw.endswith(".mp4"):
+                f = root / raw.lstrip("/")
+                if f.is_file():
+                    return self._serve_file(f)
             return super().do_GET()
 
         def do_POST(self):  # noqa: N802
