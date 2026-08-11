@@ -1,0 +1,123 @@
+# LED wall, screen C. 1728 x 540, 16:5, 10.000 s, 30 fps.  SEAMLESSNESS PASS 1.
+#
+# ISOLATES ONE DIAL: `rife.skip_boundary` 4 -> 0. Everything else is byte-identical
+# to led13_c_realloc_soft, including the map that paints the standing figure. The
+# figure is a KNOWN defect here and is left in on purpose, because changing the map
+# as well would make the motion result unattributable.
+#
+# WHY. Measured on the raw 439-frame render of led13_c_realloc_soft, frame-to-frame
+# velocity spikes at frames 54, 109, 164, 219, 274, 329, 384: exactly the keyframe
+# boundaries, and nowhere else. Within a pair the velocity is flat. The cause is
+# arithmetic, not aesthetic. `linear_interp` visits t = i/64 for i in 1..63, then
+# drops the first and last 4. So a normal frame step is 1/64 of the pair, and the
+# step ACROSS a keyframe is (4 + 1 + 4)/64 = 9/64. Nine times the normal step,
+# eight times per loop, at 0.8 Hz. That is the stepping.
+#
+# skip_boundary exists to drop RIFE's deceleration zones and flatten the sharpness
+# pulse. The measurement says those zones are not costing us velocity smoothness at
+# all, so it is paying a 9x lurch for a benefit the curve does not show.
+#
+# PREDICTION, recorded before the run so it can be wrong: velocity variation falls
+# well below the +/-20% run-to-run floor derived from led15_c_repro, and the pair
+# sharpness pulse rises somewhat from 44.7% (that floor is +/-0.7%, so a real change
+# will be legible).
+#
+# NOTE ON MEASUREMENT: at passes 6 with skip 0 the render is 8 * 63 - 1 = 503 raw
+# frames, so conform retimes 503 -> 300 and drops 203 of them. That decimation adds
+# its own shimmer. JUDGE THIS ONE ON THE RAW FILE, not the conformed one.
+#
+#     python tools/conform.py --screen bc --crop-y 288 --src <render>.mp4
+
+seed: 1087
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome, golden hour, sunset, warm light, daylight, fire, foliage, people, figures, a standing figure"
+
+subject:
+  name: led17_c_noskip
+  prompts:
+    - label: "A: starless black night, faint cold light"
+      prompt: >-
+        starless black night, faint cold light, a tall rocky crag on a shore in
+        the foreground, still black water, broken ruined columns on a low shore
+        far across the water
+    - label: "B: full moonlight, silver on the water"
+      prompt: >-
+        full moonlight, silver on the water, a tall rocky crag on a shore in the
+        foreground, still black water, broken ruined columns on a low shore far
+        across the water
+    - label: "A (return)"
+      prompt: >-
+        starless black night, faint cold light, a tall rocky crag on a shore in
+        the foreground, still black water, broken ruined columns on a low shore
+        far across the water
+
+resolution:
+  width: 1536
+  height: 896
+
+# K = (1+1) + (3+2) + 1 = 8, unchanged. raw = 8 * 63 - 1 = 503.
+frames:
+  steady: 2
+  steady_per_segment: [1, 3]
+  transition: 1
+  return_: 2
+  warmup: 3
+
+render:
+  structural_decay_radius: 1
+  steady_strengths: [0.52, 0.54, 0.52, 0.54, 0.52, 0.54, 0.52, 0.54]
+  transition_strength: 0.56
+  return_strength_start: 0.52
+  return_strength_end: 0.46
+  return_pixel_blend_max: 0.45
+
+sampling:
+  num_inference_steps: 20
+  guidance_scale: 1.5
+
+control:
+  model: diffusers/controlnet-depth-sdxl-1.0
+  image: outputs/_anchors/led2-c-desolation.png
+  scale: 0.65
+  guidance_start: 0.0
+  guidance_end: 0.6
+
+# THE ONE CHANGED LINE is skip_boundary.
+rife:
+  passes: 6
+  skip_boundary: 0
+  edge_crop: 8
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/nyc-billboard/led

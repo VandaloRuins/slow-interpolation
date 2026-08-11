@@ -870,6 +870,87 @@ of magnitude above the floor.
 63.6%. Neither frame allocation nor the control map moves it. It is the first
 return keyframe, and it is structural.
 
+## Session 2026-08-11: seamlessness is arithmetic, and the objective changed
+
+Luca's steer, mid-session: **drop the Course of Empire / NYC skyline framing and work
+only on subjects the LoRAs were trained for. The objective is soft and seamless
+interpolation with sharp focus across the whole 10 seconds, at wall geometry.** That
+is a quality target, not a narrative one, and it decomposes into measurable axes.
+
+### L27. Two of the three faults were arithmetic, not aesthetic, and nobody chose them
+
+Measured on the raw 439-frame `led13_c_realloc_soft`, not on the conformed file.
+
+**Fault 1, the keyframe lurch.** Velocity spikes at raw frames 54, 109, 164, 219, 274,
+329, 384 and nowhere else. Those are exactly the keyframe boundaries; within a pair the
+velocity is flat. The cause is in [`linear_interp`](../../../../src/slow_interpolation/interpolation/rife.py):
+it visits `t = i/64` for i in 1..63 then drops the first and last `skip_boundary`. So a
+normal step is 1/64 of a pair and the step ACROSS a keyframe is `(2*skip + 1)/64`. At
+`skip_boundary: 4` that is **9x a normal frame, eight times per loop, at 0.8 Hz.**
+
+This corrects the model in [chained-diffusion-limits.md](../../../findings/chained-diffusion-limits.md),
+which says motion is "slowest at each keyframe and fastest mid-pair". On these configs
+the opposite is true: the keyframe crossing is the FASTEST event in the clip.
+
+**Fault 2, the retime shimmer, and it is created after the render is finished.**
+`conform.py` retimes 439 to 300 with `setpts` + `fps`, i.e. nearest-neighbour
+decimation, dropping 139 frames so roughly every third output frame is a double step.
+Raw velocity runs 0.616, 0.837, 0.806, 0.597, 0.577, 0.486. The same content conformed
+runs 1.532, 0.917, 0.939, 0.555, 1.015, 0.55. The alternation does not exist upstream.
+
+**Fault 3, the sharpness pulse.** HF folded over one pair swings 44.7%, sharp at the
+keyframe and soft at the midpoint, and it is visible by eye at native resolution.
+
+### L28. The fix is config-only, and the pair `led17_*_dense` beats the previous best on every axis
+
+`skip_boundary: 0` kills fault 1. **K=10 at `passes: 5` kills fault 2 by arithmetic**:
+`10 * 31 - 1 = 309` raw frames, so conform drops 9 instead of 139. Strengths came down
+0.52/0.54 to 0.46/0.48 for the coupled dial, landing on 9 real steps at 20, clear of the
+integer boundaries at 0.45 and 0.50.
+
+Delivered files, screen C, against `led13_c_realloc_soft`. Run-to-run floors from the
+`led15_c_repro` pair are in brackets.
+
+| | control | `led17_c_dense` | floor |
+|---|---|---|---|
+| lurch (keyframe step / median step) | 2.31 | **0.99** | +-2% |
+| jitter (frame-to-frame roughness) | 0.55 | **0.18** | +-2% |
+| loop step | 4.65 | **3.43** | +-8% |
+| **light arc swing** | 10.00 | **18.56** | +-0.1% |
+| HF trough, the softest moment (raw) | 0.0192 | **0.0205** | +-1.6% |
+
+Screen B moves the same way: lurch 1.63 to 0.44, jitter 0.57 to 0.15, arc 9.50 to 16.71.
+
+**Read the pulse number correctly, it is a trap.** The folded swing gets WORSE, 44.7% to
+54.1%, and that is not a regression: the trough ROSE 6.8% while the peak rose 21%. No
+moment in the clip is softer than before. A normalised swing hides whether the floor
+moved, which is the same failure class as "frame-average metrics lie" in ratio form.
+**Always report the trough next to the swing.**
+
+**The arc result extends L22 and is the biggest number here.** Lowering strength made the
+arc nearly double (+86% on C, +76% on B), and it did it at the BRIGHT end: C's max went
+56.39 to 64.38 while its min held at 45.82. L22 recorded that the sun pole "still does
+not arrive". At K=10 with strength down, it arrives.
+
+**Noise floors for the seamlessness instruments**, derived free from `led15_c_repro`:
+lurch +-2%, pair pulse +-0.8%, HF mean +-1.3% raw, loop step +-8%, arc swing +-0.1%.
+Arc and lurch are sharp instruments; velocity variation as `(max-min)/mean` is NOT, it
+carries a +-20% floor and is not comparable between clips of different frame counts.
+
+### Open from this session
+
+- **`conform.py` should not decimate.** A motion-compensated retime on the same source
+  measured velocity variation 529% to 431% at zero sharpness cost, but the better fix is
+  the one used here: choose K and passes so the raw count lands near 300. Worth a
+  standing note in the tool, and `TARGET_FRAMES` arithmetic belongs in the config
+  comments of every new render. NOT yet edited.
+- **`linear_interp` could take an explicit frames-per-pair.** It already calls
+  `model.inference(img0, img1, timestep=t)` at arbitrary t, so `2**passes` only decides
+  HOW MANY t values. An explicit count would let a render hit exactly 300 raw frames and
+  remove the retime entirely. Small, additive, backwards compatible. Proposal only.
+- The standing figure is absent from `led17_c_dense`, but as a side effect of a different
+  trajectory, not controlled suppression. It is NOT evidence for PL12.
+
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 
 - **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,

@@ -1,0 +1,135 @@
+# LED wall, screen C. 1728 x 540, 16:5, 10.000 s, 30 fps.  SEAMLESSNESS PASS 2.
+#
+# THE CANDIDATE. led17_c_noskip isolates one dial; this one is the config that
+# tries to be BETTER, by attacking all three measured defects at once. It is
+# therefore NOT an attribution experiment: run it against led13_c_realloc_soft to
+# judge, and read led17_c_noskip for the why.
+#
+# Three defects, measured on led13_c_realloc_soft:
+#
+# 1. KEYFRAME LURCH. skip_boundary 4 at passes 6 makes the step across a keyframe
+#    9/64 of a pair against 1/64 within it. Nine times, eight times per loop.
+#    Fixed by skip_boundary: 0.
+#
+# 2. RETIME SHIMMER. 439 raw frames retimed to 300 drops 139 of them by nearest
+#    neighbour, so roughly every third output frame is a double step. Visible in
+#    the conformed file as an alternating velocity (1.53, 0.92, 0.94, 0.55, 1.02,
+#    0.55 ...) that is absent from the raw. Fixed here by ARITHMETIC: K 10 at
+#    passes 5 with no boundary skip gives 10 * 31 - 1 = 309 raw frames, so conform
+#    drops 9 instead of 139. Fifteen times fewer decimation events.
+#
+# 3. SHARPNESS PULSE. The HF curve folded over one pair swings 44.7%: sharpest at
+#    the keyframe, softest at the midpoint, because an invented mid frame blends
+#    two images that disagree. Visible by eye at native resolution (the crag loses
+#    its edges and the figure smears to a ghost). Fixed by shortening the pair:
+#    ten keyframes instead of eight puts the two endpoints of every blend closer
+#    together, so there is less for RIFE to invent.
+#
+# COUPLED DIAL, per chained-diffusion-limits.md: raising K forces steady_strengths
+# down, because total drift is roughly K x per-frame change. 8 -> 10 keyframes, so
+# 0.52/0.54 -> 0.46/0.48 and the transition and return come down with them. At 20
+# steps that is int(20 * 0.46) = 9 real steps and int(20 * 0.48) = 9, both clear of
+# the integer boundaries at 0.45 and 0.50, so no keyframe silently gets 8 while its
+# neighbour gets 9. Lowering strength is independently supported: L22 measured that
+# it makes the light arc LARGER, not smaller.
+#
+# HELD: seed, map, prompts, negative, lora_scale, guidance, steps, decay radius,
+# VAE. The standing figure will still be there; that is PL12's problem, not this
+# render's, and led15's broken-ledge map is not built on here because its verdict
+# is still owed.
+#
+#     python tools/conform.py --screen bc --crop-y 288 --src <render>.mp4
+
+seed: 1087
+
+style:
+  name: thomas_cole_epoch_10
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome, golden hour, sunset, warm light, daylight, fire, foliage, people, figures, a standing figure"
+
+subject:
+  name: led17_c_dense
+  prompts:
+    - label: "A: starless black night, faint cold light"
+      prompt: >-
+        starless black night, faint cold light, a tall rocky crag on a shore in
+        the foreground, still black water, broken ruined columns on a low shore
+        far across the water
+    - label: "B: full moonlight, silver on the water"
+      prompt: >-
+        full moonlight, silver on the water, a tall rocky crag on a shore in the
+        foreground, still black water, broken ruined columns on a low shore far
+        across the water
+    - label: "A (return)"
+      prompt: >-
+        starless black night, faint cold light, a tall rocky crag on a shore in
+        the foreground, still black water, broken ruined columns on a low shore
+        far across the water
+
+resolution:
+  width: 1536
+  height: 896
+
+# K = (2+1) + (4+2) + 1 = 10. raw = 10 * 31 - 1 = 309, i.e. 9 frames from target.
+frames:
+  steady: 2
+  steady_per_segment: [2, 4]
+  transition: 1
+  return_: 2
+  warmup: 3
+
+render:
+  structural_decay_radius: 1
+  # Lowered for K 8 -> 10. At 20 steps: 9 / 9 real steps, off the int boundary.
+  steady_strengths: [0.46, 0.48, 0.46, 0.48, 0.46, 0.48, 0.46, 0.48]
+  transition_strength: 0.50
+  return_strength_start: 0.46
+  return_strength_end: 0.40
+  return_pixel_blend_max: 0.45
+
+sampling:
+  num_inference_steps: 20
+  guidance_scale: 1.5
+
+control:
+  model: diffusers/controlnet-depth-sdxl-1.0
+  image: outputs/_anchors/led2-c-desolation.png
+  scale: 0.65
+  guidance_start: 0.0
+  guidance_end: 0.6
+
+rife:
+  passes: 5
+  skip_boundary: 0
+  edge_crop: 8
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/nyc-billboard/led
