@@ -82,6 +82,14 @@ def main() -> int:
     ap.add_argument("--project", default="slow-interpolation-glance",
                     help="Vercel project name, used only on the FIRST deploy; after "
                          "that the saved link decides, so the URL stays put")
+    ap.add_argument("--tile-fit", choices=["overlap", "contain"], default="overlap",
+                    help="overlap (default): tile width = aspect against a 1.3-unit "
+                         "pitch, so landscape assets spill over their neighbours. "
+                         "Across a thousand mixed-aspect tiles that overlap IS the "
+                         "dense-mosaic look and must stay. contain: fit each tile "
+                         "inside its cell, preserving aspect. Use it for a small "
+                         "curated field of EXTREME aspects, where a 16:5 wall piece "
+                         "is 3.2 cells wide and buries two neighbours.")
     ap.add_argument("--curate", action="store_true",
                     help="inject the tier-0 curation face (select tiles, export a "
                          "removal list for glance_export --exclude-file)")
@@ -141,6 +149,7 @@ def main() -> int:
         "title": args.title, "collection": args.collection, "tier": 0,
         "dataBase": "data", "atlasBase": atlas_dir, "thumbBase": "thumbs",
         "apiBase": "", "auth": None, "profileHello": False,
+        "tileFit": args.tile_fit,
     }), encoding="utf-8")
     r = subprocess.run([sys.executable, str(installer), "--target", str(out),
                         "--config", str(cfg), "--force"], capture_output=True, text=True)
@@ -195,6 +204,16 @@ def main() -> int:
         cands = []
         for a in videos:
             p = proxy_for(a["key"])
+            if not p:
+                # No proxy: fall back to the original if it is small enough to
+                # ship on its own. `gallery.py` only builds previews for the raw
+                # renders it indexes, so a conform.py delivery file has none at
+                # all, and a delivery-spec-only field was 0 of 12 playable while
+                # every file sat at 5 to 6 MB. These ARE the deliverable at the
+                # size it should be seen; re-compressing them would be worse for
+                # no reason. The caps still decide.
+                orig = ROOT / "outputs" / a["key"]
+                p = orig if orig.is_file() else None
             if p:
                 cands.append((p.stat().st_size / 1e6, a["key"], p))
         cands.sort()

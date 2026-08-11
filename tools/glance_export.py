@@ -37,6 +37,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timezone
+from fnmatch import fnmatch
 from pathlib import Path
 
 from PIL import Image
@@ -108,10 +109,49 @@ def generated_ts(f: Path) -> float:
     return f.stat().st_mtime
 
 
+PROBE_CACHE = OUTPUTS / "_gallery" / "probe-cache.json"
+_probe: dict | None = None
+
+
+def dimensions(f: Path) -> tuple[int, int] | None:
+    """(width, height) of a video, from gallery.py's probe cache, else ffprobe.
+
+    Filenames are the wrong key for "is this at wall spec". conform.py stamps the
+    geometry into the name for a plain render, but a client-named delivery file
+    carries no suffix at all, and on 2026-08-11 a name-based filter found 1 of the
+    6 files that are actually 912x2736. Dimensions cannot lie.
+    """
+    global _probe
+    if _probe is None:
+        try:
+            _probe = json.loads(PROBE_CACHE.read_text(encoding="utf-8"))
+        except Exception:
+            _probe = {}
+    rel = f.relative_to(ROOT) if ROOT in f.parents else f
+    hit = (_probe.get(str(f)) or _probe.get(str(rel))
+           or _probe.get(str(rel).replace("/", chr(92)))
+           or _probe.get(rel.as_posix()))
+    if hit:
+        i = hit.get("info") or {}
+        if i.get("width"):
+            return int(i["width"]), int(i["height"])
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+             "stream=width,height", "-of", "csv=p=0:s=x", str(f)],
+            capture_output=True, text=True, timeout=30).stdout.strip()
+        w, hgt = out.split("x")[:2]
+        return int(w), int(hgt)
+    except Exception:
+        return None
+
+
 def collect(include_frames: bool, limit: int | None,
             include: list[str] | None = None,
             since_days: float | None = None,
-            exclude_keys: set[str] | None = None):
+            exclude_keys: set[str] | None = None,
+            match: list[str] | None = None,
+            specs: set[tuple[int, int]] | None = None):
     import time as _time
     cutoff = (_time.time() - since_days * 86400) if since_days else None
     items = []
@@ -136,6 +176,17 @@ def collect(include_frames: bool, limit: int | None,
             continue
         if exclude_keys and rel.as_posix() in exclude_keys:
             continue
+        # Delivery-spec scope. `--include` is a prefix, so it cannot select the
+        # conform.py suffix that actually marks a file as wall-ready; this is a
+        # glob over the whole relative path and can.
+        if match and not any(fnmatch(rel.as_posix(), pat) for pat in match):
+            continue
+        # Delivery-spec scope, by ACTUAL GEOMETRY rather than by filename.
+        if specs is not None:
+            if ext not in VID_EXT:
+                continue
+            if dimensions(f) not in specs:
+                continue
         items.append((f, rel, ext in VID_EXT, is_frame))
         if limit and len(items) >= limit:
             break
@@ -177,6 +228,23 @@ def main() -> int:
     ap.add_argument("--include", action="append", default=None,
                     help="only assets whose outputs/-relative path starts with this; "
                          "repeatable. The curated-exhibition switch.")
+    ap.add_argument("--match", action="append", default=None,
+                    help="only assets whose outputs/-relative path matches this glob; "
+                         "repeatable, OR-ed. The DELIVERY-SPEC switch: conform.py "
+                         "stamps the wall geometry into the filename, so "
+                         "--match '*__bc_1728x540.mp4' --match '*__a_912x2736.mp4' "
+                         "keeps exactly the files that are wall-ready and drops every "
+                         "raw render and test. Unlike a removal list this is standing: "
+                         "tomorrow's conform lands in the field, tomorrow's raw does not.")
+    ap.add_argument("--spec", action="append", default=None,
+                    help="only videos whose ACTUAL dimensions are WxH; repeatable, "
+                         "OR-ed. The wall-ready switch: --spec 1728x540 --spec "
+                         "912x2736 keeps exactly the pieces cut for the LED walls "
+                         "and drops every raw render and test. Prefer this over "
+                         "--match: a client-named delivery file carries no geometry "
+                         "in its name, so a name filter silently missed 5 of the 6 "
+                         "vertical pieces. Standing, so tomorrow's conform qualifies "
+                         "automatically.")
     ap.add_argument("--dest", default=None,
                     help="output dir (default outputs/_glance); thumbs are still cached "
                          "in outputs/_glance/thumbs and copied in")
@@ -196,7 +264,9 @@ def main() -> int:
         excl = {e["key"] for e in doc.get("exclude", []) if e.get("key")}
         print(f"excluding {len(excl)} curated-out asset(s)")
     items = collect(not args.no_frames, args.limit, args.include,
-                    since_days=args.since_days, exclude_keys=excl)
+                    since_days=args.since_days, exclude_keys=excl, match=args.match,
+                    specs=({tuple(int(v) for v in sp.lower().split("x")) for sp in args.spec}
+                           if args.spec else None))
     if not items:
         sys.exit("nothing to export")
 

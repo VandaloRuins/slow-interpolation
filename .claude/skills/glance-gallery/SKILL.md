@@ -127,6 +127,40 @@ cloudflared tunnel --url http://127.0.0.1:8766  # only if Luca is not on the wif
 `--since-days` dates by MANIFEST (`started_at_utc`), never mtime: syncs rewrite mtime and
 a mtime window sweeps in years-old work.
 
+**The wall-ready field: filter by GEOMETRY, never by filename.**
+
+```bash
+python tools/glance_export.py --no-frames --since-days 8 --collection ledwall \
+    --spec 1728x540 --spec 912x2736 --exclude-file outputs/_glance-inbox/cumulative.json \
+    --dest outputs/_glance-ledwall
+python tools/glance_deploy.py --export outputs/_glance-ledwall --out outputs/_glance-ledwall-deploy \
+    --pin ledwall --curate --tile-fit contain --max-asset-mb 12 --collection ledwall --deploy --prod
+```
+
+`--spec` keeps only videos whose ACTUAL dimensions match, so the field holds the pieces
+cut for the walls and nothing else. It is standing: tomorrow's conform qualifies by
+itself, tomorrow's raw render never appears, and no removal list has to be maintained.
+
+**A filename filter was tried first and was wrong.** `conform.py` stamps the geometry into
+the name of a plain render, but a client-named delivery file carries no suffix at all, so
+`--match '*__a_912x2736.mp4'` found **1 of the 6** files that are actually 912x2736 and
+silently produced a horizontal-only field. `--match` still exists for path patterns;
+for "is this at wall spec", dimensions cannot lie. They come from `gallery.py`'s
+probe-cache, with an ffprobe fallback.
+
+**`--tile-fit contain` for a field of extreme aspects.** The viewer sizes a tile
+`w = aspect, h = 1` against a 1.15 to 1.3 unit pitch, so landscape assets overlap; across
+a thousand mixed-aspect tiles that IS the dense-mosaic look and must stay in the archive.
+At 3.2 (16:5) a tile spans two neighbours and at 0.33 (1:3) it is a sliver. `contain` fits
+each tile inside its cell preserving aspect, the same rule review mode already uses. It is
+a viewer config field defaulting to `overlap`, so no other project's field changes.
+
+**Delivery files have no proxy, and that once shipped a link of dead posters.**
+`gallery.py` only builds previews for the raw renders it indexes, so a spec-only field was
+**0 of 12 playable** on Vercel while the tunnel showed 12. `glance_deploy.py` now falls
+back to the original when no proxy exists; at 5 to 6 MB these are the deliverable at the
+size it should be seen, so raise `--max-asset-mb` rather than re-compressing them.
+
 **Curation (tier 0). Removal is LOCAL, IMMEDIATE and REVERSIBLE.** `--curate` injects
 `tools/glance_curate.js` plus the pre-boot shim `tools/glance_curate_hide.js`. The curate
 chip enters the field's own select mode (it always existed but lies dormant below tier 1;
