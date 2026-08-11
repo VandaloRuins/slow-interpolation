@@ -87,7 +87,14 @@ def make_handler(root: Path, token: str | None):
 
         def log_message(self, fmt, *args):
             # Static noise is useless here; the POST logs itself explicitly.
-            if "POST" in (args[0] if args else ""):
+            #
+            # str() is load-bearing: log_error() calls this with an HTTPStatus
+            # enum as args[0], not a string, so a bare `"POST" in args[0]` raises
+            # TypeError. That fires inside send_error(), i.e. while a 404 is being
+            # written, so a missing favicon produced a traceback and a truncated
+            # response instead of a clean 404. Found in the live log 2026-08-10.
+            first = str(args[0]) if args else ""
+            if "POST" in first or "curate" in first:
                 super().log_message(fmt, *args)
 
         def _json(self, code: int, payload: dict) -> None:
