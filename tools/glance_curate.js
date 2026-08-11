@@ -58,6 +58,14 @@ const MARKS_KEY = `glance-curate-marks:${COLLECTION}`;
 const HIDDEN_KEY = `glance-curate-hidden:${COLLECTION}`;
 const EXPORTED_KEY = `glance-curate-exported:${COLLECTION}`;
 
+// A SINK is a same-origin endpoint that accepts the removal list, so a removal
+// reaches the agent with no download and no file handling. `tools/serve_glance.py`
+// provides one; the Vercel deploy does not, and 404s the probe. So the same build
+// works in both places and configures itself: with a sink, removals are sent
+// automatically; without one, the export banner is the fallback it always was.
+const SINK = "curate/removals";
+let sinkReady = false;
+
 let marks = new Map();    // sha16 -> key, transient selection
 let hidden = new Map();    // sha16 -> key, the accumulated removal list
 let exportedCount = 0;     // how many hidden entries were in the last export
@@ -203,12 +211,62 @@ function render() {
   }
 }
 
-function removeSelected() {
+// Probe for the sink once. A 404 (Vercel) simply means manual export stays the
+// route; nothing is logged as an error because that is a supported deployment.
+fetch(SINK, { method: "GET", cache: "no-store" })
+  .then((r) => r.ok ? r.json() : null)
+  .then((info) => {
+    if (!info || info.sink !== "ok") return;
+    sinkReady = true;
+    const b = bar.querySelector('button[data-a="export"]');
+    if (b) b.title = "Also saved automatically; this downloads a copy";
+    showNote("connected to the agent: removals are sent automatically, "
+           + "no file to hand over.");
+    render();
+  })
+  .catch(() => {});
+
+function payloadFor(map) {
+  return {
+    action: "exclude-from-curated-field",
+    exported: new Date().toISOString(),
+    collection: COLLECTION,
+    exclude: [...map].map(([sha16, key]) => ({ sha16, key })),
+  };
+}
+
+/** Send the removal list to the same-origin sink. Returns true if it landed. */
+async function sendToSink(map) {
+  if (!sinkReady || !map.size) return false;
+  try {
+    const r = await fetch(SINK, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payloadFor(map)),
+    });
+    return r.ok;
+  } catch (e) {
+    console.warn("curate: sink POST failed", e);
+    return false;
+  }
+}
+
+async function removeSelected() {
   if (!marks.size) return;
   for (const [sha, key] of marks) hidden.set(sha, key);
   marks.clear();
   writeStore(HIDDEN_KEY, hidden);
   writeStore(MARKS_KEY, marks);
+  // Send BEFORE reloading, and await it: a reload cancels in-flight requests.
+  // The whole list goes each time rather than a delta, so one lost POST cannot
+  // desync the agent's view from this device's.
+  if (sinkReady) {
+    const sent = await sendToSink(hidden);
+    if (sent) {
+      exportedCount = hidden.size;   // delivered, so the nudge is not owed
+      try { localStorage.setItem(EXPORTED_KEY, String(exportedCount)); } catch (e) {}
+    }
+  }
   // The shim tags these `archived` before glance.js builds the field, so the
   // reload IS the removal. Nothing else takes them off a live canvas.
   location.reload();
