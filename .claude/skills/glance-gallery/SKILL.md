@@ -146,6 +146,22 @@ a silently inert shim.
 selection; `hidden` is the accumulated removal list that drives the shim AND is what gets
 sent or exported. Hidden entries self-prune once a rebuild has removed the asset for real.
 
+**`--exclude-file` is NOT cumulative, and that self-pruning is why it matters.** It
+excludes exactly the keys in the file you hand it. The face posts its whole hidden list,
+but it drops entries the last rebuild already removed, so `latest.json` covers only what
+is still in the field. Feed it alone and everything removed in an earlier pass comes
+straight back. Build the union of the applied history plus `latest.json`:
+
+```bash
+outputs/_glance-inbox/applied/applied-*.json  +  latest.json  ->  cumulative.json
+```
+
+**Keep `applied/` clean or the union lies.** It must hold ONLY lists that were actually
+applied. On 2026-08-10 the stamped audit copies were filed there too, including the
+61-card long-press accident that a `restore` had already undone, and the next union
+silently re-applied it: an expected 74 tiles came out as 36. Never-applied posts go to
+`audit/`. Always assert the tile count against `previous - len(latest)` before deploying.
+
 **Four ways back, in increasing bluntness**, because a long-press selects a WHOLE CLUSTER
 and on a phone that is one slightly-too-long tap from hiding sixty cards (it happened):
 bulk-confirm needs a second tap at 10 or more; `undo` restores the pre-removal list for ten
