@@ -1212,6 +1212,42 @@ Eye inspection ran FIRST this time, before any Gemini spend.
 and worst-flagged moment all opened and judged. The t=2-4s softness is the drift itself,
 wet paint moving, same flag class the keepers carry.
 
+## Session 2026-08-12 (later): the Arendt pivot, and the first loop that beats every chained render
+
+### L38. New direction: the Vita Activa series
+
+Luca's call: drop the long-aspect single pieces as primary format. The work becomes a
+SERIES of 10 s loops on Hannah Arendt's vita activa triad (labor / work / action, The
+Human Condition 1958; his descriptions verified against sources, terminology corrected:
+"work as repetition" is Arendt's LABOR), later EDITED side by side into the long
+billboard file. For both the NYC billboard and the objkt labs release. Show-side record:
+`Ruins-agent/knowledge/research/arendt-vita-activa-series.md`. Styles: Cole and Soutine
+LoRAs, plus NO-LORA prompt-styled experiments.
+
+### L39. Edit-model keyframes: only the acting element moves, and it beats the chain
+
+The capability Luca specified: keyframes authored with an image-EDIT model (Gemini
+image editing, `gemini-3.1-flash-image`) that holds everything constant except the
+acting element, so interpolation animates just that element.
+
+**Validated end to end, first try.** `tools/banana_keyframes.py` + local RIFE Phase C
+(`vendor/rife_v425`, no Modal, w and h must be % 64):
+
+- Five keyframes: hands washing in a sink from above, prompt-styled oil paint, no LoRA.
+  Background SSIM 0.83 to 0.94 between consecutive keyframes with the hands masked.
+- `outputs/arendt/labor_hands.mp4`, 1408x768, 300 frames, 10.000 s.
+- **Gate: subject 10, loop 9, motion 9, image 9. Highest scores of the project.** Every
+  chained render scored motion 5 to 7; this scores 9 because the morphing complaint is
+  absent BY CONSTRUCTION: keyframes disagree only where they are supposed to.
+
+**Why this matters beyond one clip.** The diffusion chain re-derives the whole image
+every keyframe, so everything morphs a little; two days of tuning fought that. The
+edit-model path inverts the architecture: consistency is the default and change is
+authored. Phase A becomes optional per piece. Open questions: whether the aesthetic
+holds without the chain's drift texture (Luca judges), per-keyframe control maps for
+ControlNet passes over these keyframes, and the wrap pair (author the last edit to land
+near the base state, or the wrap carries the biggest step).
+
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 
 - **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,
