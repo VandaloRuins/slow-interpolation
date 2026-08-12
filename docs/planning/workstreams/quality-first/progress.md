@@ -1248,6 +1248,35 @@ holds without the chain's drift texture (Luca judges), per-keyframe control maps
 ControlNet passes over these keyframes, and the wrap pair (author the last edit to land
 near the base state, or the wrap carries the biggest step).
 
+### L40. The first Arendt triptych: two of three land, and the third names a law
+
+Built banana-first in the soft register (sfumato brief, impasto banned), ~10 to 14
+keyframes each at SMALL deltas (consecutive SSIM 0.82 to 0.98 against the probe's
+0.64 to 0.73), local RIFE, 300 frames at 10.000 s. Keyframes eyed and measured
+BEFORE interpolation, per Luca's instruction.
+
+| piece | cluster | gate | seam treatment |
+|---|---|---|---|
+| `labor_knead` | Labor | 9/9/5/8 PASS | bridge keyframe authored from BOTH endpoints (multi-image edit) to shrink the wrap |
+| `action_window` | Action | **9/10/9/8 PASS** | ten-frame held dark beat before the wrap, the doctrine's in-breath, and the gate scored the loop 10 |
+| `work_chair` | Work | FAIL loop 4, twice | see below |
+
+**What the chair taught, in two layers.** First attempt: the hand materialised in one
+keyframe step; pixel SSIM (0.94) cannot see semantic velocity, so keyframe critique
+must check WHAT changed, not how many pixels. Second attempt spread entry and exit
+over three keyframes each and still failed on speed, which exposes the real law:
+**a 10-second loop cannot contain a plot.** Decay + entry + work + exit is four acts;
+every act above one is paid for in speed. The redesign drops the decay act: the
+hand's single slow pass IS the loop, care as perpetual. More Arendtian anyway.
+
+**Mechanics worth keeping:** nano banana accepts MULTI-IMAGE input, so a wrap can be
+closed by handing it both endpoint keyframes and asking for the in-between (labor's
+bridge). The tone drift across a chain (table warming) caps endpoint SSIM but RIFE
+cross-fades it invisibly; do not chase it. 448 raw frames to 300 is the documented
+judder ratio, so long chains retime with minterpolate mci, not frame drops. And
+Gemini flagged the kneading table's own plank grain as a border artefact: eye
+overrides recorded as false positive.
+
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 
 - **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,
