@@ -1277,6 +1277,26 @@ judder ratio, so long chains retime with minterpolate mci, not frame drops. And
 Gemini flagged the kneading table's own plank grain as a border artefact: eye
 overrides recorded as false positive.
 
+### L41. Hammershøi dataset: sourcing and audit under way
+
+Luca picked Hammershøi over Morandi from side-by-side mosaics (Morandi reviewed and
+deleted; in copyright, never to be trained without an explicit decision). Sources:
+
+- **SMK API**: 64 works with images, all flagged public_domain. Audited: **zero
+  perceptual duplicates** (dhash, after fixing a hash bug that made every image
+  identical); 15 border suspects are charcoal-on-paper margins and portrait mounts,
+  nearly all outside the register anyway.
+- **Wikimedia Commons**: category tree walked recursively (58 categories, including
+  a pre-sorted `Paintings of interiors by Vilhelm Hammershøi`), **260 unique files
+  listed**. Download was 429-throttled after burst fetching; restarted at 6 s pace
+  honouring Retry-After. Lesson recorded: Wikimedia throttles the IP, not the
+  request, so a burst poisons the whole session.
+
+Next: dedupe the wave against SMK (Commons carries multiple scans of one painting,
+keep highest resolution), register filter (interiors, windows, still, pale
+landscape; drop portraits and nudes per the Cole figure-drift experience), review
+mosaic to Luca, then caption and train (~$0.30-1.60 on Modal).
+
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 
 - **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,
