@@ -1156,6 +1156,35 @@ exits 1 naming unapplied keys, `--apply` archives and rebuilds. Runs before ever
 export. His removals are permanent and are never re-added by the agent, including
 clips that outscore the keeper floor.
 
+### L36. Two published clips failed by eye, and the gate now withholds PASS until the eye step is recorded
+
+Luca, 2026-08-12: the Renoir clips carry "line artefacts on the left and right side"
+and the Cole "has a loss of detail and looks underdeveloped". Both confirmed at
+native resolution and both pulled (plus `led20_base_s40`, same edge). Only
+`led22_casa_anchor` survived inspection and stays.
+
+**Neither was an instrument gap. Both were the agent skipping its own documented
+steps.** The gate had already written the edge strips and labelled them INSPECT BY
+EYE; they sat unopened while the clips published on scores. And the Cole haze was
+observed by the agent at first look ("Cole is very soft"), then overridden by
+Gemini's image 8. Two rules follow:
+
+1. **A score never overrides your own eye.** Gemini's image axis is +-1 and it
+   watches a downscaled clip; the native-res frame is the evidence.
+2. **The strip inspection is now enforced, not requested.** `review_gate.py` can no
+   longer emit PASS from scores: it emits PENDING-EYE, and `--signoff <clip>
+   --edges-clean --detail-ok` flips it only after both claims are made about files
+   actually opened, timestamped into `review-gate.json`. Signoff evaluates stored
+   scores against the current keeper floor and cannot override a floor failure.
+
+**On the Cole underdevelopment, the diagnosis is L30's trade seen from the other
+side.** kf_ssim was optimised to 0.849 at strength 0.35, and that agreement was
+bought by under-painting: a chain that barely repaints barely develops. The anchored
+chain fixed the ramp but capped detail at 8 real steps per keyframe. Development
+needs steps, agreement needs small strength; the two are the same dial only at fixed
+step count, so the next lever is `num_inference_steps` up at strength held low,
+which raises steps-per-keyframe without raising drift. Untested.
+
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 
 - **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,

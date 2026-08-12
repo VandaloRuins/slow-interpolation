@@ -358,8 +358,18 @@ def gate(path: Path, subject: str, baseline: dict | None = None) -> dict:
 
     return {
         "clip": path.name,
-        "pass": not verdict,
-        "reasons": verdict,
+        # Scores clearing the floor do NOT pass the clip. On 2026-08-12 two clips
+        # were published on scores while their edge strips, already written and
+        # labelled INSPECT BY EYE, sat unopened; both carried the striped canvas
+        # edge and Luca found it on the wall link. A third was published over the
+        # agent's own observation of haze because Gemini said image 8. So the
+        # verdict a score-only run can produce is PENDING-EYE, and "pass" stays
+        # false until `--signoff` records that the strips and a native-resolution
+        # mid-loop frame were actually looked at.
+        "pass": False,
+        "scores_ok": not verdict,
+        "eye": None,
+        "reasons": verdict if verdict else ["pending-eye"],
         "scores": {k: g.get(k) for k in ("subject", "loop", "motion", "image")},
         "notes": {k: g.get(k) for k in ("subject_note", "loop_note", "motion_note",
                                         "image_note", "worst", "best")},
@@ -375,11 +385,49 @@ def gate(path: Path, subject: str, baseline: dict | None = None) -> dict:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("videos", nargs="+")
+    ap.add_argument("videos", nargs="*")
     ap.add_argument("--subject", default="")
     ap.add_argument("--baseline", help="a clip of the SAME subject; enables the "
                                        "measured border check")
+    ap.add_argument("--signoff", metavar="CLIP",
+                    help="record the eye inspection for CLIP (its review-gate.json "
+                         "entry must already be scores_ok) and flip it to pass")
+    ap.add_argument("--edges-clean", action="store_true",
+                    help="signoff: both edge strips were OPENED and are clean")
+    ap.add_argument("--detail-ok", action="store_true",
+                    help="signoff: a native-res mid-loop frame was OPENED and the "
+                         "surface reads as developed paint, not haze")
     a = ap.parse_args()
+    if a.signoff:
+        prev = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() else {}
+        key = next((k for k in prev if a.signoff in k), None)
+        if key is None:
+            print(f"no gate entry matches {a.signoff!r}; gate it first")
+            return 1
+        r = prev[key]
+        # Evaluate the STORED scores against the CURRENT floor: entries written
+        # before the 2026-08-12 recalibration carry flag-fatal verdicts that no
+        # longer apply, and a signoff must not depend on when the clip was gated.
+        sc = r.get("scores") or {}
+        floor_fail = [f"{a}={sc.get(a)}<{f}" for a, f in KEEPER_FLOOR.items()
+                      if not (isinstance(sc.get(a), (int, float)) and sc[a] >= f)]
+        if floor_fail:
+            print(f"{key} is below the keeper floor ({', '.join(floor_fail)}); "
+                  f"signoff cannot override scores")
+            return 1
+        if not (a.edges_clean and a.detail_ok):
+            print("signoff requires BOTH --edges-clean and --detail-ok, and each is a "
+                  "claim that the file was actually opened")
+            return 1
+        from datetime import datetime, timezone
+        r["eye"] = {"edges_clean": True, "detail_ok": True,
+                    "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        r["pass"] = True
+        r["reasons"] = []
+        prev[key] = r
+        OUT.write_text(json.dumps(prev, indent=1), encoding="utf-8")
+        print(f"PASS recorded for {key} (eye inspection signed off)")
+        return 0
     baseline = None
     if a.baseline:
         baseline = _quality().features(Path(a.baseline), K=10, limit=150)
@@ -392,8 +440,8 @@ def main():
         r = gate(p, a.subject, baseline)
         results.append(r)
         s = r["scores"]
-        tag = "PASS" if r["pass"] else "FAIL"
-        if not r["pass"]:
+        tag = "PENDING-EYE" if r["scores_ok"] else "FAIL"
+        if not r["scores_ok"]:
             failed += 1
         print(f"\n{tag}  {r['clip']}")
         sp = r.get("spread", {})
