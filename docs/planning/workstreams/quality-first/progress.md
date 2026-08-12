@@ -1349,6 +1349,28 @@ window recesses enlarged, "glowing warm amber windows" promoted to the head of t
 light phrase, and lora_scale dropped a step (0.80 to 0.70) to loosen the grey grip
 at the peak. Not yet run.
 
+### L44. vhm v3: the drawn map wins the composition, the dataset loses the night
+
+v3 with a DRAWN 11x4 window grid (after two derived maps: one produced outlines,
+one debris; the control-map doctrine reconfirmed a third time), full-bleed anchor,
+scale 0.70, glow phrase leading. Results: the grid held perfectly through the whole
+chain, the amber arc arrived in the panes, the border ring was trimmed off
+mechanically. Gate: 9/9/6/6, FAIL on image against the keeper floor.
+
+**The residual fault is not a dial, it is the dataset.** The dark pole never gets
+dark: vhm renders pale grey daylight at a prompt that says deep blue-grey dusk,
+because Hammershøi painted almost no nocturnes and the corpus has essentially none.
+A LoRA cannot render a register it never saw. Consequence for the series:
+
+- **Action (the lit facade at dusk) is the WRONG piece for vhm.** The banana
+  original (9/10/9/8) stands as the Action candidate.
+- **Labor and Work interiors are vhm's literal home register** (rooms, furniture,
+  raking window light, the woman at her task). The chair piece IS a Hammershoi
+  subject. Point the LoRA there next.
+
+Chain params that worked and carry forward: drawn map at 0.65, full-bleed anchor at
+0.45 / warmup 1, base 40 steps, trim at delivery.
+
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 
 - **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,
