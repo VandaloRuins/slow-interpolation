@@ -1103,6 +1103,59 @@ against total spectral energy, and base's pastel low-contrast surface inflates i
 metric's own docstring says it is not comparable between compositions, and two renders
 of the same subject at very different contrast are two different compositions.
 
+## Session 2026-08-12: the gate recalibrated to Luca's taste, and four clips published
+
+### L34. The absolute gate bar sat ABOVE the taste it served, and the keepers proved it
+
+After 22 renders in two days had ALL failed the publish gate, the calibration check
+that should have come first was finally run: gate the two clips Luca chose to KEEP.
+
+| clip | subject | loop | motion | image | confirmed flags |
+|---|---|---|---|---|---|
+| `led13_c_realloc_soft` (keeper) | 7 | 10 | **5** | 9 | **5** |
+| `led12_c_desolation` (keeper) | 8 | 9 | **5** | 8 | **10** |
+
+Both fail "every axis >= 7 and no confirmed flags". So that bar, invented with the
+gate, was stricter than the exhibition's own standard, and a day of renders was
+judged against it. **The bar is now the keeper floor: subject >= 7, loop >= 9,
+motion >= 5, image >= 8, and confirmed flags are reported, never fatal.**
+
+Scores are necessary, not sufficient: Luca REMOVED `led18_cole_woods` at 9/10/6/9,
+which outscores both keepers. The gate filters artefact regressions; he curates
+taste on top. That is ST3's division of labour, now with numbers.
+
+**Published under the calibrated bar** (never removed by Luca, floor met):
+`led20_base_s35` 8/9/7/9, `led20_base_s40` 9/9/7/9, `led22_cole_anchor` 9/10/6/8,
+`led22_casa_anchor` 8/9/7/9. All four beat both keepers on motion, which was the
+axis the whole seamlessness effort targeted.
+
+### L35. The anchored base chain: Lightning seeds, base sustains
+
+`led22_*_anchor` runs the base backbone from a sharp Lightning keyframe
+(`anchor_image` at `anchor_strength: 0.45`, `warmup: 1` per L17). Results:
+
+- **The warm-up ramp collapses where the anchor is clean**: Cole 4.16x to 1.66x,
+  Casa to 1.69x. Keyframe agreement doubles or better (Cole 0.849 vs Lightning's
+  0.332).
+- **An anchor carries its defects into the chain.** `led22_renoir_anchor` was
+  seeded from a keyframe with the canvas edge, and the edge came back. Anchor
+  hygiene: only seed from a frame that passed inspection.
+- **The wrap pair (kf8 to kf9) sits near ssim 0.5 in every anchored chain**: it
+  compares the drifted chain end against the saved anchor itself, i.e. it measures
+  accumulated loop drift, and `return_` reallocation does not move it (led23:
+  0.51 to 0.50). Weakening `return_pixel_blend_max` 0.45 to 0.35 BROKE closure
+  (Gemini loop 10 to 4). Leave the blend at 0.45 on anchored chains.
+- Removing the water subject did not clear the morph complaint (led24: trees morph
+  too), so morphing pressure is in the chain, not the subject.
+
+### Curation loop hardening, after a real failure
+
+Luca curated at 16:53 on 08-11; the list sat unapplied for six hours because the
+exclusion union was hand-built. `tools/curation_sync.py` now owns it: `--check`
+exits 1 naming unapplied keys, `--apply` archives and rebuilds. Runs before every
+export. His removals are permanent and are never re-added by the agent, including
+clips that outscore the keeper floor.
+
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 
 - **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,

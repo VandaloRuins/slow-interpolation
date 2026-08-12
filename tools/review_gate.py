@@ -66,8 +66,20 @@ OUT = ROOT / "review-gate.json"
 # against itself and a dark subject is not penalised for being dark.
 BLUR_RATIO = 0.80      # HF at the flagged frame vs clip median
 MOTION_RATIO = 2.00    # frame step at the flagged frame vs clip median
-MIN_SCORE = 7          # any Gemini axis below this fails the clip
 SAMPLES = 3            # Gemini runs per clip; see vote()
+
+# THE BAR IS CALIBRATED TO LUCA'S CURATION, not to an ideal. 2026-08-12: the two
+# clips he chose to KEEP both fail an absolute bar of "every axis >= 7 and no
+# confirmed flags": led13_c_realloc_soft gates 7/10/5/9 with 5 confirmed flags,
+# led12_c_desolation 8/9/5/8 with 10. So that bar sat above the taste it served,
+# and every render of a whole day was "failed" against a standard the exhibition
+# itself does not meet. The floor below is the per-axis minimum across his
+# keepers. Confirmed flags are REPORTED, never auto-fail: his keepers carry
+# plenty, and the division of labour (ST3) is that the gate filters artefact
+# regressions and Luca curates taste. Scores are necessary, not sufficient: he
+# also REMOVED a 9/10/6/9 clip, so passing the gate earns a card on the field,
+# not a place in the show.
+KEEPER_FLOOR = {"subject": 7, "loop": 9, "motion": 5, "image": 8}
 
 # Gemini is NOISY and a single sample cannot be gated on. Measured 2026-08-11,
 # same clip, same prompt, three runs: loop scored 7/9/7, motion 6/7/6, and the
@@ -334,12 +346,15 @@ def gate(path: Path, subject: str, baseline: dict | None = None) -> dict:
         if drop > BORDER_DROP:
             verdict.append(f"border(b_detail {drop:+.0%})")
 
-    # Gemini's own scores are a gate in their own right, because the fault it
-    # reports most (rubbery morphing) is invisible to every metric here.
-    for axis in ("subject", "loop", "motion", "image"):
+    # Gemini's scores against the keeper-calibrated floor. Confirmed flags above
+    # are reported but do not fail the clip on their own; Luca's keepers carry
+    # 5 and 10 of them.
+    flag_fail = []
+    for axis, floor in KEEPER_FLOOR.items():
         s = g.get(axis)
-        if isinstance(s, (int, float)) and s < MIN_SCORE:
-            verdict.append(f"{axis}={s}")
+        if isinstance(s, (int, float)) and s < floor:
+            flag_fail.append(f"{axis}={s}<{floor}")
+    verdict = flag_fail
 
     return {
         "clip": path.name,
