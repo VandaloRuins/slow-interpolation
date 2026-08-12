@@ -1,0 +1,96 @@
+# LED wall, 16:5 band. 1536x896 render -> 1728x540 delivered, 10.000 s, 30 fps.
+#
+# led27: RENOIR AND FLOWERS PARKED (Luca 2026-08-12). Cole, Soutine and Casa, on
+# LIGHTNING: base is refuted on Cole (washed out at both 24 and 40 steps) and
+# worse on Soutine. Seamless recipe throughout (K=10, passes 5, skip 0, raw 309).
+#
+# THE MID-LOOP DETAIL LOSS Luca reported on the flower fields is now measured and
+# is in PHASE A: keyframe sharpness runs a U across the loop (mid-loop at 15-27%
+# of the endpoints on the led26 pair), because warmup develops the A pole with 30+
+# real steps and the return pins the end back to that image, while mid-loop
+# keyframes drift at low authority with nothing re-anchoring them.
+#
+# High-mountain storm, no water at all, cloud carries the drift.
+#
+#     python tools/conform.py --screen bc --crop-y 288 --src <render>.mp4
+
+seed: 1087
+
+style:
+  name: led27_tcole_summit
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.9
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "photograph, 3D render, digital art, smooth blending, picture frame, ornate border, vignette, canvas edge, artist signature, watermark, blurry, text, people, figures, buildings, towers, city, ruins, columns"
+
+subject:
+  name: led27_tcole_summit
+  # Subject clause byte-identical across A and B; only the light phrase moves (L21).
+  prompts:
+    - label: "A: black storm light, heavy cloud"
+      prompt: >-
+        black storm light, heavy cloud, storm clouds breaking over a high mountain summit filling the whole frame, sheer rock faces and drifting vapour
+    - label: "B: shafts of pale sunlight through the storm"
+      prompt: >-
+        shafts of pale sunlight through the storm, storm clouds breaking over a high mountain summit filling the whole frame, sheer rock faces and drifting vapour
+    - label: "A (return): black storm light, heavy cloud"
+      prompt: >-
+        black storm light, heavy cloud, storm clouds breaking over a high mountain summit filling the whole frame, sheer rock faces and drifting vapour
+
+resolution:
+  width: 1536
+  height: 896
+
+# K = (2+1) + (4+2) + 1 = 10. raw = 10 * 31 - 1 = 309, nine frames from target.
+frames:
+  steady: 2
+  steady_per_segment: [2, 4]
+  transition: 1
+  return_: 2
+  warmup: 3
+
+render:
+  structural_decay_radius: 1
+  steady_strengths: [0.46, 0.48, 0.46, 0.48, 0.46, 0.48, 0.46, 0.48]
+  transition_strength: 0.50
+  return_strength_start: 0.46
+  return_strength_end: 0.40
+  return_pixel_blend_max: 0.45
+
+sampling:
+  num_inference_steps: 20
+  guidance_scale: 1.5
+
+rife:
+  passes: 5
+  skip_boundary: 0
+  edge_crop: 8
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/nyc-billboard/led
