@@ -1297,6 +1297,31 @@ keep highest resolution), register filter (interiors, windows, still, pale
 landscape; drop portraits and nudes per the Cole figure-drift experience), review
 mosaic to Luca, then caption and train (~$0.30-1.60 on Modal).
 
+### L42. The vhm LoRA: Luca's curation processed, training dispatched
+
+The dataset-mosaic protocol ran end to end for Hammershøi in one day. Luca walked the
+gallery (`datasets/hammershoi/serve.py`, the renoir-flowers tooling reused): **115
+keeps, 18 rejects, 3 manual crops**. He overruled 13 of the agent's proposed drops,
+keeping Hammershøi's figures (Ida with the teacup, the models seen from behind) in
+the register: the curator's call, now captioned in a figure register.
+
+Packaging: captions aligned 115/115 (5 slug-collision duplicates deduped), crops
+applied at percent coordinates so they survive resolution changes, staged as
+image+txt pairs, 118 MB ZIP, uploaded. Training dispatched:
+`examples/configs/training/hammershoi_interiors.yaml`, trigger `vhm`, floral preset
+(rank 16/8, lr 3e-5, repeats 6), publishing `Hammershoi_Interiors_epoch_{epoch}`.
+
+Sourcing lessons for the next dataset, all paid for in wall-clock:
+- **Wikimedia throttles the IP, not the request.** One burst poisoned every later
+  fetch; Retry-After compliance is mandatory from the first request.
+- **The thumb server 400s when asked to upscale**: request 1600px only for files
+  whose original exceeds it, else fetch the original.
+- **Slug collisions silently overwrite**: two scans of one painting can share a
+  slug; keep the caption list deduped by filename and let the perceptual hash own
+  duplicate detection (32 dupes caught across SMK+Commons).
+- Mixed 1600/900px training input accepted deliberately: SDXL bucketing handles it
+  and the Renoir set trained the same way. Do not chase pixels past the bucket size.
+
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 
 - **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,

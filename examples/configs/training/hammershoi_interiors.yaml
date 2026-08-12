@@ -1,0 +1,100 @@
+# Hammershoi interiors LoRA, for the Arendt Vita Activa series.
+# Decided by Luca 2026-08-12 from side-by-side mosaics against Morandi.
+# Dataset: 115 works curated by Luca in the dataset-mosaic gallery
+# (SMK CC0 + Wikimedia Commons, deduped by perceptual hash, his crops
+# applied). All public domain, Hammershoi d. 1916. FLORAL preset per
+# the manual: atmospheric, low-frequency, soft tonal transitions.
+trainer: kohya
+base_model: stabilityai/stable-diffusion-xl-base-1.0
+
+dataset:
+  # TODO 1: filename of the CivitAI-shape ZIP on the slow-interp-datasets
+  # volume. Upload first via `modal run -m cloud.upload_dataset --src
+  # datasets/<name>/<name>-civitai.zip`.
+  zip: hammershoi-civitai.zip
+  # TODO 2: 3 to 4-letter trigger orthogonal to real words. See
+  # docs/manual/dataset-curation.md Phase 0 step 2.
+  trigger: vhm
+  caption_extension: .txt
+
+training:
+  # PRESET SELECTION (read this before tweaking the 4 lines below).
+  #
+  # Two validated presets; pick by inspecting the dataset style:
+  #
+  #   FLORAL (default, set below): atmospheric / low-frequency / soft
+  #     transitions / broken colour. Renoir, Monet, tonalism,
+  #     impressionist landscape. ~$0.80-1.50, 24-47 min on L40S.
+  #
+  #   EXPRESSIONIST: gestural / high-frequency / mark-making /
+  #     distortion. Soutine, Bacon, Schiele, Kokoschka, Van Gogh,
+  #     Munch. ~$0.30-0.50, 10-15 min on L40S. Override:
+  #         network_rank:    32
+  #         network_alpha:   32
+  #         unet_lr:         5.0e-4
+  #         repeats:         2
+  #
+  # Full decision logic + evidence:
+  # docs/manual/train-lora-on-modal.md "Pick the preset BEFORE you copy"
+  # docs/findings/expressionist-style-preset.md
+  #
+  # Mixed / unsure: try floral first (cheaper, smaller files). If the
+  # cold-run validation shows style did not transfer, re-train as v2
+  # with the expressionist preset and archive v1 as negative-result
+  # baseline (Soutine workstream did this; see soutine-lora/progress.md).
+  network_rank: 16
+  network_alpha: 8
+  unet_lr: 3.0e-5
+  text_encoder_lr: 0
+  optimizer: adamw8bit
+  lr_scheduler: cosine_with_restarts
+  lr_scheduler_num_cycles: 4
+  batch_size: 2
+  gradient_accumulation: 4
+  repeats: 6
+  epochs: 10
+  save_every_n_epochs: 1
+  mixed_precision: bf16
+  min_snr_gamma: 5.0
+  gradient_checkpointing: true
+  caption_shuffle: false
+  caption_tag_dropout: 0
+  resolution: 1024
+  enable_bucket: true
+  min_bucket_reso: 768
+  max_bucket_reso: 1344
+  bucket_no_upscale: true
+  network_train_unet_only: true
+
+per_image_repeats: null
+
+modal:
+  gpu: L40S
+  timeout: 14400
+  retries: 0
+
+# Trainer-inline validation: 3 prompts × 3 epochs = 9-cell contact
+# sheet, 1024×1024, 30-step SDXL. Cheap signal during training. The
+# production-quality grid is `cloud/validate_lora.py` driven by a
+# per-family YAML at examples/configs/validation/<family>.yaml.
+validation:
+  # TODO 3: 3 short prompts that exercise the LoRA's target subject.
+  # Start each with the trigger.
+  prompts:
+    - "vhm, a quiet interior with a woman seen from behind, bare walls, grey diffuse daylight, smooth blended tonal gradients, sfumato, oil painting"
+    - "vhm, an empty room with white double doors ajar, pale sunlight on the floor, dust in the light, oil painting"
+    - "vhm, a pale open landscape with scattered trees, flat pearl sky, muted greens and greys, oil painting"
+  render_at_epochs: [1, 5, 10]
+  lora_scale: 0.80
+  seed: 0
+  output_format: contact_sheet
+
+# Publish trained checkpoints to the top of slow-interp-loras so
+# cloud/validate_lora.py loads them by convention.
+publish:
+  # TODO 4: filename template, `{epoch}` is substituted. Convention:
+  # PascalCase family + underscore + Subject + "_epoch_{epoch}".
+  # Match the lora_filename_template in
+  # examples/configs/validation/<family>.yaml so the validator picks
+  # up your files.
+  checkpoint_template: "Hammershoi_Interiors_epoch_{epoch}.safetensors"
