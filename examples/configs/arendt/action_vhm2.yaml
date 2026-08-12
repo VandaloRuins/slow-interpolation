@@ -1,0 +1,111 @@
+# V2 after v1 collapsed to blank wall: the vhm caption corpus is saturated with
+# bare walls, so the LoRA carries a blank-wall prior that erased the window grid;
+# an anchor alone cannot hold composition against a LoRA prior (the ControlNet
+# lesson, relearned). This pins the grid with a depth map derived from the lit
+# banana keyframe (windows as recesses), and drops "plaster walls" from the
+# prompt so the wall prior is not summoned by name.
+#
+# THE SPACE OF APPEARANCE, re-rendered through the vhm LoRA. Arendt series,
+# Action cluster, candidate for the objkt release and the NYC billboards.
+#
+# The painter of windows renders the windows piece: Hammershoi interiors LoRA
+# (epoch 10 at 0.80, chosen 2026-08-12 by instrument sweep over 4 epoch grids:
+# epoch 10 won detail, tonal compression, grey chroma and cross-prompt
+# coherence simultaneously, no overfit signature) on the SDXL base backbone,
+# anchored on the eye-approved banana facade keyframe. Light-only discipline:
+# the subject clause is byte-identical, only the window-light phrase moves.
+# Action's time: one spark, then spread, then the return to possibility.
+
+seed: 1087
+
+style:
+  name: hammershoi_interiors_epoch_10
+  lora_path: models/loras/Hammershoi_Interiors_epoch_10.safetensors
+  lora_scale: 0.80
+  prefix: "vhm, "
+  suffix: ", smooth blended tonal gradients, sfumato, oil painting"
+  negative_prompt: "photograph, 3D render, digital art, saturated color, impasto, thick paint, heavy brushstrokes, signature, watermark, frame, border, canvas edge, people, figures"
+
+subject:
+  name: arendt_action_vhm2
+  prompts:
+    - label: "A: every window dark"
+      prompt: >-
+        every window dark, deep blue-grey dusk, the facade of an old apartment
+        building filling the whole frame, even rows of windows, a wall of windows in even rows filling the frame,
+        no people
+    - label: "B: many windows lit warm"
+      prompt: >-
+        many windows lit with a warm amber glow against the night, the facade
+        of an old apartment building filling the whole frame, even rows of
+        windows, a wall of windows in even rows filling the frame, no people
+    - label: "A (return)"
+      prompt: >-
+        every window dark, deep blue-grey dusk, the facade of an old apartment
+        building filling the whole frame, even rows of windows, a wall of windows in even rows filling the frame,
+        no people
+
+resolution:
+  width: 1408
+  height: 768
+
+# K = (2+1) + (4+2) + 1 = 10. raw = 10 * 31 - 1 = 309.
+frames:
+  steady: 2
+  steady_per_segment: [2, 4]
+  transition: 1
+  return_: 2
+  warmup: 1
+
+render:
+  structural_decay_radius: 1
+  anchor_image: outputs/arendt/anchors/action_window_kf0.png
+  anchor_strength: 0.45
+  steady_strengths: [0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35]
+  transition_strength: 0.38
+  return_strength_start: 0.35
+  return_strength_end: 0.30
+  return_pixel_blend_max: 0.45
+
+control:
+  model: diffusers/controlnet-depth-sdxl-1.0
+  image: outputs/arendt/anchors/action_window_gridmap.png
+  scale: 0.65
+  guidance_start: 0.0
+  guidance_end: 0.6
+
+sampling:
+  num_inference_steps: 40
+  guidance_scale: 6.0
+
+rife:
+  passes: 5
+  skip_boundary: 0
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: null
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/arendt

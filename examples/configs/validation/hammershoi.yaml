@@ -1,0 +1,84 @@
+# Validation prompt set for the Hammershoi interiors LoRA family (vhm).
+#
+#   modal run -m cloud.validate_lora --config examples/configs/validation/hammershoi.yaml --epoch 10
+#
+# Runs on PURE SDXL BASE (lightning_lora null): the vhm family deploys on the
+# base backbone at guidance 6.0 (quality-first L31), and epoch choice must be
+# made on the deployment backbone. Track 1 = the Arendt series production
+# targets (off-distribution). Track 2 = in-distribution hold-outs.
+
+family: hammershoi
+lora_filename_template: "Hammershoi_Interiors_epoch_{epoch}.safetensors"
+default_epochs: [1, 5, 10]
+
+render:
+  width: 1216
+  height: 832
+  seed: 42
+  lora_scale: 0.80
+  guidance_scale: 6.0
+  num_inference_steps: 40
+  base_model: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: null
+  lightning_weight: null
+  taesd_vae: madebyollin/taesdxl
+
+negative_prompt: >
+  photograph, 3D render, anime, cartoon, digital art, saturated color,
+  impasto, thick paint, heavy brushstrokes, signature, watermark, frame,
+  border, canvas edge
+
+tracks:
+  - name: series
+    label: "Track 1, Arendt series targets (off-distribution)"
+    prompts:
+      - slug: S1-facade-dusk
+        text: >
+          vhm, the facade of an old apartment building at dusk, rows of dark
+          windows, one window lit with a warm glow, deep blue-grey light,
+          smooth blended tonal gradients, oil painting
+      - slug: S2-hands-dough
+        text: >
+          vhm, two hands kneading a round mass of pale dough on a floured
+          table seen from above, grey diffuse morning light, muted warm
+          neutrals, oil painting
+      - slug: S3-wooden-chair
+        text: >
+          vhm, a simple wooden chair alone on bare floorboards against a
+          plain plaster wall, low raking afternoon light from a window,
+          satin sheen on the wood, oil painting
+      - slug: S4-window-sunlight
+        text: >
+          vhm, an empty room with tall windows, pale sunlight falling across
+          bare floorboards, dust in the light, grey walls, oil painting
+      - slug: S5-sink-water
+        text: >
+          vhm, a white ceramic basin with a thin stream of water, seen from
+          above, quiet grey light, muted tonal palette, oil painting
+      - slug: S6-street-night
+        text: >
+          vhm, a quiet city street at nightfall, blond stone facades, no
+          people, the last pale light in the sky, oil painting
+  - name: holdout
+    label: "Track 2, in-distribution hold-outs"
+    prompts:
+      - slug: H1-woman-behind
+        text: >
+          vhm, a quiet interior with a woman in a dark dress seen from
+          behind, bare grey walls, soft diffuse daylight, oil painting
+      - slug: H2-white-doors
+        text: >
+          vhm, an interior with white double doors ajar, light from an
+          unseen window, grey and umber tones, oil painting
+      - slug: H3-pale-landscape
+        text: >
+          vhm, a pale open landscape with scattered bare trees, flat pearl
+          sky, muted greens and greys, oil painting
+      - slug: H4-candlelit-table
+        text: >
+          vhm, a dark interior with a round table and two candlesticks, deep
+          shadow, a faint warm glow, oil painting
+      - slug: H5-courtyard
+        text: >
+          vhm, a building courtyard in winter light, blond walls and dark
+          windows, snow on the ground, still air, oil painting

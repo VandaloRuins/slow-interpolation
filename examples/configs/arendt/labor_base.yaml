@@ -1,0 +1,92 @@
+# Arendt series, LABOR: source frame for the edit-model keyframe chain.
+#
+# PURPOSE: Luca 2026-08-12: generate the FIRST image with SDXL base, not the edit
+# model, then let nano banana move the hands only very slightly. This render
+# exists to produce candidate BASE FRAMES (its keyframes land in staging/), one
+# of which seeds tools/banana_keyframes.py. The video output is incidental.
+#
+# STYLE: no LoRA at all (lora_path empty skips the load). Luca on the first
+# probe's look: "too material, I would go for something softer and more
+# gradient". So: sfumato, smooth tonal gradients, diffuse light, no impasto.
+#
+# 1408x768: RIFE-legal (both % 64) and the edit chain inherits it.
+
+seed: 1087
+
+style:
+  name: no_lora_soft
+  lora_path: null
+  lora_scale: 0.0
+  prefix: "a soft tonal painting in muted greys and warm neutrals, smooth blended gradients, sfumato, diffuse morning light, no visible brushstrokes, "
+  suffix: ", delicate, atmospheric, luminous soft focus"
+  negative_prompt: "impasto, thick paint, heavy brushstrokes, texture, photograph, harsh light, saturated color, frame, border, signature, watermark"
+
+subject:
+  name: arendt_labor_base
+  prompts:
+    - label: "A"
+      prompt: >-
+        looking straight down into a white ceramic bathroom sink, two hands
+        resting under a thin stream of water from the tap, water pooling softly
+    - label: "B"
+      prompt: >-
+        looking straight down into a white ceramic bathroom sink, two hands
+        resting under a thin stream of water from the tap, water pooling softly
+    - label: "A (return)"
+      prompt: >-
+        looking straight down into a white ceramic bathroom sink, two hands
+        resting under a thin stream of water from the tap, water pooling softly
+
+resolution:
+  width: 1408
+  height: 768
+
+frames:
+  steady: 1
+  transition: 1
+  return_: 1
+  warmup: 3
+
+render:
+  structural_decay_radius: 1
+  steady_strengths: [0.40, 0.40]
+  transition_strength: 0.40
+  return_strength_start: 0.40
+  return_strength_end: 0.35
+  return_pixel_blend_max: 0.45
+
+sampling:
+  num_inference_steps: 40
+  guidance_scale: 6.0
+
+rife:
+  passes: 5
+  skip_boundary: 0
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: null
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/arendt

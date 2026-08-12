@@ -143,17 +143,22 @@ def _render_impl(
             f"or upload via cloud/upload_weights.py."
         )
 
-    # Build SDXL Lightning pipeline (same recipe as cloud/app.py renderers).
+    # Build the SDXL pipeline. Lightning fuse is CONDITIONAL: set
+    # `lightning_lora: null` in the validation YAML to validate on pure base,
+    # which matters because epoch choice must be made on the deployment
+    # backbone (Lightning and base behave oppositely through the chain, see
+    # quality-first L27/L31; the vhm family deploys on base at guidance 6).
     tA = time.perf_counter()
     pipe = DiffusionPipeline.from_pretrained(
         base_model, torch_dtype=torch.float16, variant="fp16"
     ).to("cuda")
-    pipe.load_lora_weights(lightning_lora, weight_name=lightning_weight)
-    pipe.fuse_lora()
-    pipe.unload_lora_weights()
-    pipe.scheduler = EulerDiscreteScheduler.from_config(
-        pipe.scheduler.config, timestep_spacing="trailing"
-    )
+    if lightning_lora:
+        pipe.load_lora_weights(lightning_lora, weight_name=lightning_weight)
+        pipe.fuse_lora()
+        pipe.unload_lora_weights()
+        pipe.scheduler = EulerDiscreteScheduler.from_config(
+            pipe.scheduler.config, timestep_spacing="trailing"
+        )
     pipe.vae = AutoencoderTiny.from_pretrained(
         taesd_vae, torch_dtype=torch.float16
     ).to("cuda")

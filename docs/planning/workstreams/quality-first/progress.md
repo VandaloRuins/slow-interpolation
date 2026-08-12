@@ -1322,6 +1322,33 @@ Sourcing lessons for the next dataset, all paid for in wall-clock:
 - Mixed 1600/900px training input accepted deliberately: SDXL bucketing handles it
   and the Renoir set trained the same way. Do not chase pixels past the bucket size.
 
+### L43. vhm epoch choice by instrument, and the first two chain lessons of a fresh LoRA
+
+**Epoch selection ran as a real instrument sweep**, not an eyeball: `validate_lora`
+extended to run on the deployment backbone (`lightning_lora: null` now supported,
+because epoch choice must be made on the backbone that ships, L27/L31), 11 prompts
+across epochs 1/5/8/10 on pure base at guidance 6. Epoch 10 won every axis
+simultaneously: detail (HF 1.66 vs 1.43), tonal compression (value range 107 vs 136,
+Hammershøi's own signature), grey chroma (8.3), cross-prompt coherence (0.39). A
+monotonic sweep with no trade-off = no overfit signature. **Epoch 10 at 0.80 is the
+family default.**
+
+**Chain lesson 1: a caption prior is a composition force.** The vhm corpus is
+saturated with "bare walls / plain plaster wall", and the first Space-of-Appearance
+chain (`arendt_action_vhm`) collapsed to exactly that: blank wall mid-frame, windows
+squeezed to the edges. An anchor image alone cannot hold composition against a LoRA
+prior; naming the prior in the prompt ("plaster walls") summons it. Same mechanism
+as Cole's staffage, opposite sign.
+
+**Chain lesson 2: the map pins what the prior erases, but the map's margins paint as
+smear.** v2 added a depth map derived from the lit banana keyframe (windows as
+recesses): the grid SURVIVED the whole chain, proving the pin, but the map's grey
+margin band rendered as a smeared ring, and the lit-window warmth barely penetrates
+the LoRA's grey. v3 spec: full-bleed map (build from a frame cropped to the facade),
+window recesses enlarged, "glowing warm amber windows" promoted to the head of the
+light phrase, and lora_scale dropped a step (0.80 to 0.70) to loosen the grey grip
+at the peak. Not yet run.
+
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 
 - **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,
