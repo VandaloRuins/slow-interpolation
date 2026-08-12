@@ -1,0 +1,104 @@
+# LED wall, 16:5 band, seed 1087.
+#
+# led28: THE KEEPER DISCIPLINE RESTORED. Luca 2026-08-12: the tcole outputs read
+# as "fast interpolations between slightly differently composed images" rather
+# than a smooth evolution, and asked pointedly whether ControlNet and the slow
+# meditative flow were still in use. They were not: the style sweep dropped the
+# map at led18 and never restored it, while BOTH clips Luca kept are map-pinned
+# (rigid% 21-30 with a map, 7-9 without). And the slow flow IS the light-only
+# discipline: composition pinned, subject clause byte-identical, only the light
+# phrase moves. This batch is that discipline on the seamless frame recipe
+# (K=10, passes 5, skip 0, raw 309), with the keeper's own denoise schedule.
+#
+# The C desolation map with a NEW arc: grey dusk into a dying ember glow.
+#
+#     python tools/conform.py --screen bc --crop-y 288 --src <render>.mp4
+
+seed: 1087
+
+style:
+  name: led28_c_ember
+  lora_path: models/loras/Thomas_Cole_epoch_10.safetensors
+  lora_scale: 0.90
+  prefix: "tcole, romantic oil painting, Hudson River School style, "
+  suffix: ""
+  negative_prompt: "picture frame, ornate border, vignette, canvas edge, artist signature, watermark, photograph, blurry, sepia, yellowed varnish, brown monochrome, people, figures, golden hour, daylight, foliage"
+
+subject:
+  name: led28_c_ember
+  # Byte-identical to led3 / led12. Only the light phrase moves.
+  prompts:
+    - label: "A: cold blue-grey dusk, still air"
+      prompt: >-
+        cold blue-grey dusk, still air, a tall rocky crag on a shore in the foreground, still black water, broken ruined columns on a low shore far across the water
+    - label: "B: last ember light low on the horizon, dark water"
+      prompt: >-
+        last ember light low on the horizon, dark water, a tall rocky crag on a shore in the foreground, still black water, broken ruined columns on a low shore far across the water
+    - label: "A (return): cold blue-grey dusk, still air"
+      prompt: >-
+        cold blue-grey dusk, still air, a tall rocky crag on a shore in the foreground, still black water, broken ruined columns on a low shore far across the water
+
+resolution:
+  width: 1536
+  height: 896
+
+# K = (1+1) + (3+2) + 1 = 8, the same as led12. raw = 8 * 55 - 1 = 439.
+frames:
+  steady: 2
+  steady_per_segment: [2, 4]
+  transition: 1
+  return_: 2
+  warmup: 3
+
+render:
+  structural_decay_radius: 1
+  # Lowered. At 20 steps: 10 / 10 / 10 real steps.
+  steady_strengths: [0.52, 0.54, 0.52, 0.54, 0.52, 0.54, 0.52, 0.54]
+  transition_strength: 0.56
+  return_strength_start: 0.52
+  return_strength_end: 0.46
+  return_pixel_blend_max: 0.45
+
+sampling:
+  num_inference_steps: 20
+  guidance_scale: 1.5
+
+control:
+  model: diffusers/controlnet-depth-sdxl-1.0
+  image: outputs/_anchors/led2-c-desolation.png
+  scale: 0.65
+  guidance_start: 0.0
+  guidance_end: 0.6
+
+rife:
+  passes: 5
+  skip_boundary: 0
+  edge_crop: 8
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: ByteDance/SDXL-Lightning
+  lightning_weight_name: sdxl_lightning_4step_lora.safetensors
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/nyc-billboard/led
