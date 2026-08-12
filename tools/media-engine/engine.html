@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slow Interpolation Media Engine</title>
+<link rel="stylesheet" href="/engine.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <h1>Slow Interpolation <span>MEDIA ENGINE</span></h1>
+  </div>
+  <nav class="tabs">
+    <button class="tab active" data-view="engine">Engine Room</button>
+    <button class="tab" data-view="library">Library</button>
+  </nav>
+  <div class="phase-wrap">
+    <span id="phase-badge" class="phase-badge idle">idle</span>
+  </div>
+</header>
+
+<!-- ============================= ENGINE ROOM ============================= -->
+<main id="view-engine" class="view active">
+
+  <section class="batch-panel" id="batch-panel">
+    <div class="batch-meta" id="batch-meta">
+      <div class="bm-row"><span class="bm-label">source</span><span id="bm-source" class="bm-value mono">--</span></div>
+      <div class="bm-row"><span class="bm-label">bucket prefix</span><span id="bm-prefix" class="bm-value mono">--</span></div>
+      <div class="bm-row">
+        <span class="bm-label">batch</span>
+        <span class="bm-value"><span id="bm-edition" class="chip">--</span>
+        <span id="bm-class" class="chip">--</span>
+        <span id="bm-artists" class="chip">--</span></span>
+      </div>
+      <div class="bm-row"><span class="bm-label">providers</span><span id="bm-providers" class="bm-value mono">--</span></div>
+    </div>
+    <div class="batch-actions">
+      <button id="btn-scan" class="btn">Scan source</button>
+      <button id="btn-dryrun" class="btn primary" disabled>Dry run (3)</button>
+      <button id="btn-approve" class="btn ok" disabled>Approve full run</button>
+    </div>
+  </section>
+
+  <section class="ledger" id="ledger">
+    <div class="ledger-item"><span class="ledger-num" id="lg-discovered">0</span><span class="ledger-label">discovered</span></div>
+    <span class="ledger-eq">=</span>
+    <div class="ledger-item ok"><span class="ledger-num" id="lg-catalogued">0</span><span class="ledger-label">catalogued</span></div>
+    <span class="ledger-eq">+</span>
+    <div class="ledger-item"><span class="ledger-num" id="lg-duplicates">0</span><span class="ledger-label">duplicates</span></div>
+    <span class="ledger-eq">+</span>
+    <div class="ledger-item err"><span class="ledger-num" id="lg-quarantined">0</span><span class="ledger-label">quarantined</span></div>
+    <span class="ledger-eq">+</span>
+    <div class="ledger-item dim"><span class="ledger-num" id="lg-excluded">0</span><span class="ledger-label">excluded</span></div>
+    <span class="ledger-eq">+</span>
+    <div class="ledger-item ac"><span class="ledger-num" id="lg-inflight">0</span><span class="ledger-label">in flight</span></div>
+    <div class="ledger-balance" id="lg-balance">BALANCED</div>
+    <div class="cost-ticker">
+      <span class="ct-label">gemini</span>
+      <span class="mono" id="ct-calls">0 calls</span>
+      <span class="mono" id="ct-cost">EUR 0.0000</span>
+      <span class="mono dim" id="ct-est"></span>
+    </div>
+  </section>
+
+  <section class="gate hidden" id="approval-gate">
+    <div class="gate-head">Dry run complete -- review before the full run</div>
+    <div class="gate-body" id="gate-body"></div>
+    <div class="gate-actions">
+      <button class="btn ok" id="btn-gate-approve">Approve full run</button>
+      <span class="dim" id="gate-estimate"></span>
+    </div>
+  </section>
+
+  <section class="rail-wrap">
+    <div class="rail" id="rail"></div>
+  </section>
+
+  <section class="lanes">
+    <div class="lane" id="lane-quarantine">
+      <div class="lane-head err-text">Quarantine</div>
+      <div class="lane-body" id="quarantine-body"><div class="lane-empty">nothing quarantined</div></div>
+    </div>
+    <div class="lane" id="lane-duplicates">
+      <div class="lane-head dim">Duplicates</div>
+      <div class="lane-body" id="duplicates-body"><div class="lane-empty">no duplicates</div></div>
+    </div>
+  </section>
+
+  <section class="console-wrap">
+    <div class="console-head">
+      <span>live console</span>
+      <span class="dim mono" id="console-updated"></span>
+    </div>
+    <pre class="console" id="console"></pre>
+  </section>
+
+</main>
+
+<!-- ============================== LIBRARY ============================== -->
+<main id="view-library" class="view">
+  <div class="library-layout">
+
+    <aside class="facets">
+      <div class="facet-block">
+        <div class="facet-title">Review</div>
+        <button class="facet-chip review-chip" id="chip-review">
+          Review queue <span class="badge" id="review-count">0</span>
+        </button>
+      </div>
+      <div class="facet-block" id="facet-media-type"><div class="facet-title">Media type</div></div>
+      <div class="facet-block" id="facet-asset-class"><div class="facet-title">Asset class</div></div>
+      <div class="facet-block" id="facet-artist"><div class="facet-title">Artist</div></div>
+      <div class="facet-block" id="facet-context"><div class="facet-title">Context / event</div></div>
+      <div class="facet-block" id="facet-day">
+        <div class="facet-title">Day</div>
+        <div class="day-chips" id="day-chips"></div>
+        <label class="toggle disabled" title="No event dates in this batch (press-kit assets carry capture dates, not opening nights)">
+          <input type="checkbox" disabled> openings only
+        </label>
+      </div>
+      <button class="btn subtle" id="btn-clear-facets">clear filters</button>
+    </aside>
+
+    <section class="grid-wrap">
+      <div class="grid-head">
+        <span id="grid-count" class="dim">0 assets</span>
+        <button class="btn subtle" id="btn-reload-cat">reload catalogue</button>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="review-list hidden" id="review-list"></div>
+    </section>
+
+    <aside class="detail hidden" id="detail">
+      <button class="detail-close" id="detail-close">&times;</button>
+      <div class="detail-thumb" id="detail-thumb"></div>
+      <div class="detail-name mono" id="detail-name"></div>
+      <div class="detail-caption" id="detail-caption"></div>
+      <div class="detail-rows" id="detail-rows"></div>
+      <div class="detail-tags" id="detail-tags"></div>
+      <button class="btn" id="btn-copy-link">copy r2:// link</button>
+    </aside>
+
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<!-- ============================== TEMPLATES ============================== -->
+<template id="t-rail-col">
+  <div class="rail-col">
+    <div class="rail-col-head"></div>
+    <div class="rail-col-body"></div>
+  </div>
+</template>
+
+<template id="t-file-card">
+  <div class="file-card">
+    <div class="fc-name mono"></div>
+    <div class="fc-meta dim"></div>
+    <div class="fc-sub"></div>
+    <button class="fc-exclude" title="exclude from batch">&times;</button>
+  </div>
+</template>
+
+<template id="t-quarantine-row">
+  <div class="q-row">
+    <span class="q-name mono"></span>
+    <span class="q-reason dim"></span>
+    <button class="btn subtle q-retry">retry</button>
+  </div>
+</template>
+
+<template id="t-grid-tile">
+  <div class="tile">
+    <div class="tile-img"></div>
+    <div class="tile-name mono"></div>
+    <div class="tile-badges"></div>
+  </div>
+</template>
+
+<template id="t-review-row">
+  <div class="review-row">
+    <div class="rr-thumb"></div>
+    <div class="rr-body">
+      <div class="rr-asset mono"></div>
+      <div class="rr-question"></div>
+      <div class="rr-conf dim"></div>
+    </div>
+    <div class="rr-actions">
+      <button class="btn ok rr-confirm">confirm</button>
+      <button class="btn err rr-reject">reject</button>
+    </div>
+  </div>
+</template>
+
+<script src="/engine.js"></script>
+</body>
+</html>

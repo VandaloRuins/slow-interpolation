@@ -1,0 +1,29 @@
+{
+  "project_name": "Slow Interpolation",
+  "project_slug": "slow-interpolation",
+
+  "bucket": "slow-interpolation-media",
+
+  "collection": "nyc-billboard",
+  "collection_term": "commission",
+
+  "scene_examples": [
+    "painterly-landscape",
+    "seascape",
+    "figure-study",
+    "flower-study",
+    "architectural-ruin"
+  ],
+
+  "py": "py -3.11",
+
+  "report_dir": "outputs/_archive-reports",
+  "default_source": "outputs",
+
+  "kb": {
+    "root": ""
+  },
+
+  "supabase_domain": "",
+  "supabase_anon_key": ""
+}
