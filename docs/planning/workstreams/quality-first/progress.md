@@ -1185,6 +1185,33 @@ needs steps, agreement needs small strength; the two are the same dial only at f
 step count, so the next lever is `num_inference_steps` up at strength held low,
 which raises steps-per-keyframe without raising drift. Untested.
 
+### L37. led25: the development dial works on Renoir, the edge is strength-bound, and the trim ships
+
+Four renders at `num_inference_steps: 40`, strength held 0.35 (14 real steps against 8).
+Eye inspection ran FIRST this time, before any Gemini spend.
+
+- **Development recovered on Renoir**: `led25_renoir_peony`'s opening frames show formed
+  petal structure inside what used to be the warm-up haze. The 14-step recipe fixes the
+  underdevelopment Luca called out, on this LoRA.
+- **It did NOT recover Cole** (`led25_cole_steps` still washed out). The anchored-base
+  recipe is refuted on Cole at any tested steps; Cole currently has no working base
+  recipe. Chrys and wisteria stayed milky: subjects whose detail is fine-grained
+  (small blooms, clusters) need more than 14 steps or more strength; the close-up
+  peony resolved because its forms are large.
+- **The canvas edge is STRENGTH-bound, not steps-bound.** led19 at 0.46/11 real steps:
+  clean. led25 at 0.35/14 real steps: edge present. So it is repaint fraction that
+  overwrites the band each keyframe, not denoise depth, and low-strength Renoir will
+  always paint it.
+- **The shipping fix is mechanical: trim the band before conform.** Crop 56 px per side
+  off the raw render, conform upscales 1.227x instead of 1.137x. Edge verified gone by
+  eye in the delivered file. Cost: zero renders. Caveat: the trimmed intermediate loses
+  manifest provenance; acceptable for candidates, fix conform.py provenance pass-through
+  if a trim ever ships as a delivery file.
+
+**Published after signoff**: `led25_renoir_peony_trim`, gate 9/9/6/9, edges and opening
+and worst-flagged moment all opened and judged. The t=2-4s softness is the drift itself,
+wet paint moving, same flag class the keepers carry.
+
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 
 - **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,
