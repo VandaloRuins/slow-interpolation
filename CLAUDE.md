@@ -127,6 +127,7 @@ The user (Luca) drives this project through natural language. When he says any o
 | "the X LoRA over-fit, re-curate", "fix the X dataset", "re-audit the X dataset" | Invoke `dataset-mosaic` for the targeted re-curation. |
 | "what's the state of the X dataset", "where is the Y dataset" | Invoke `dataset-mosaic` to report. |
 | "package X for training", "build the training ZIP for X" | Invoke `dataset-mosaic` Phase 5. |
+| "browse the X dataset", "glance mosaic for X", "dataset mosaic link for X", "show the final X set with crops" | Build + serve the read-only dataset Glance mosaic per [docs/manual/dataset-glance.md](docs/manual/dataset-glance.md). Main session can do it directly (reads `datasets/<name>/`, writes only `tools/mosaic-glance/`). NOT the Phase 3 review surface; student actions stay in the curation gallery. |
 | **lever** | |
 | "what settings for X", "what knobs for this Y render", "tune this clip", "tune this YAML" | Invoke `lever` for a YAML stanza or diff with rationale. |
 | "pick noise for X", "what noise source for X", "tune the noise for this clip" | Invoke `lever` for the noise-decision walk. |
@@ -188,6 +189,27 @@ It builds the commit on a temporary index parented on a freshly fetched trunk, s
 - `ship untracked` lists real content nobody ever committed; `ship contested` lists files carrying another chat's hunks. `ship rules` prints the full standard.
 
 The session hooks live in `.claude/settings.local.json` (gitignored), so they fire on the maintainer's machine only and a student cloning the repo inherits nothing.
+
+## Verify the way the user will experience it
+
+Standing rule, from the 2026-08-08 render session. Before telling Luca something is
+ready, check it through the path he will actually use, not the path that produced it.
+
+On that day the agent said "it's live" or "it's fixed" five times when it was not, and
+**every failure was silent**: a command exited zero having written nothing, a page
+contained the right markup but had never been rebuilt, a security test passed against a
+different application, a server returned 200 to a range request it had ignored, and a
+sharpness verdict came from a montage that discarded two thirds of the resolution.
+
+Concretely:
+
+- A code change is not a page change. Rebuild, then check the **served** artefact.
+- An exit code is not a result. Check the artefact exists and has the expected size or count.
+- Never report a fix from the same measurement that motivated it.
+- If the user reports something you cannot reproduce, suspect the **viewing path** first:
+  a compressed proxy, a downscaled sheet, a cached page, a stale build.
+
+The four skills in `.claude/skills/` encode the specific traps per workflow.
 
 ## Memory Doctrine
 

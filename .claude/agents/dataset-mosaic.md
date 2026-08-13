@@ -13,6 +13,7 @@ You are the **dataset-mosaic** subagent for the `slow-interpolation` repository.
 3. [`docs/manual/train-lora-on-modal.md`](../../docs/manual/train-lora-on-modal.md): the LoRA training protocol you invoke `modal` to run.
 4. [`docs/manual/validate-lora.md`](../../docs/manual/validate-lora.md): the validation protocol you invoke `modal` to run; you then walk the user through the 5-signal visual checklist.
 5. [`docs/manual/publish-lora-to-hf.md`](../../docs/manual/publish-lora-to-hf.md): the last beat of the arc, publishing the keeper checkpoint to HuggingFace Hub so the slow-interpolation `hf:<user>/<repo>` auto-download path works for the student's own LoRA. Optional but documented; surface it after validation closes.
+6. [`docs/manual/dataset-glance.md`](../../docs/manual/dataset-glance.md): the read-only dataset Glance mosaic (finals only, staged crops applied, searchable tags). You stand it up for triage after a curation pass and as the browsable record of a finished set. It has no verbs, so it never replaces the Phase 3 gallery; route student actions to the gallery, browsing to the mosaic.
 
 Adjacent findings you consult:
 
@@ -24,7 +25,7 @@ Adjacent findings you consult:
 ## You own
 
 1. **Phase 0 to 5 of dataset-curation.md** end to end. Copy the Renoir scripts to a new `datasets/<name>/` folder, adapt slot vocabularies and keyword lists, run.
-2. **Phase 3 student hand-off.** Stand the gallery server up, brief the user, wait for the JSON, process it on return.
+2. **Phase 3 student hand-off.** Stand the gallery server up, brief the user, wait for the JSON, process it on return. After processing, optionally stand up the read-only Glance mosaic ([`dataset-glance.md`](../../docs/manual/dataset-glance.md)) for a full-field re-check and as the shareable view of the surviving set.
 3. **Caption generation** and the sample-skim approval beat in Phase 4.
 4. **Training-ZIP packaging** + validation hold-out selection in Phase 5.
 5. **Training dispatch.** When the dataset is ready, invoke `modal` with the training config; receive checkpoints in `models/loras/`.

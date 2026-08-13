@@ -105,3 +105,20 @@ gallery-feedback.json
 # Maintainer-local MCP servers (Canva, for the deck). Not part of the pipeline;
 # a student cloning this repo should not be offered a Canva server.
 .mcp.json
+
+# Glance export: build artifact, regenerate with tools/glance_export.py
+outputs/_glance/
+outputs/_glance-renders/
+outputs/_glance-deploy/
+
+# --- media archive kit ---
+tools/.env
+tools/data/kb-export/
+tools/data/media-vectors/
+tools/media-engine/cache/
+tools/media-engine/runs/
+tools/media-engine/dist/
+outputs/
+
+# Glance dataset-mosaic sites: viewer payload + thumbnails derived from raw/ (image bytes stay out; rebuild with tools/mosaic-glance/build_mosaic_archive.py)
+tools/mosaic-glance/site*/

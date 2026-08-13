@@ -5,6 +5,12 @@
 you are showing finished MP4s or keyframe PNGs to the maintainer, you want
 [render-gallery.md](render-gallery.md) and `tools/gallery.py` instead.
 
+**Not the Glance mosaic either.** For a read-only browse of a dataset's current
+state (finals only, staged crops applied, searchable audit and curation tags),
+stand up the dataset Glance mosaic per [dataset-glance.md](dataset-glance.md).
+This gallery is the only ACTION surface: remove, crop, flag and export exist
+here and nowhere else. Route by job, not by which page is prettier.
+
 You are an AI agent helping a student build a LoRA dataset per the protocol in [dataset-curation.md](dataset-curation.md). The gallery is the only step you cannot run yourself: the student must visually walk every candidate image, remove off-topic content, and hand-crop borderlines. Your job is to stand the gallery up, brief the student, and process the JSON they hand back.
 
 This page documents:

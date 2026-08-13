@@ -199,6 +199,15 @@ py -3.11 datasets/<name>/apply_browser_crops.py
 
 The script reads `~/Downloads/gallery-flags.json`, backs up originals to `raw_orig/`, applies bbox + rotation, upscales if needed, updates `processed.json`.
 
+### Optional: full-field re-check in the Glance mosaic
+
+For a fast second look at what survived the pass (removed images gone, crops
+rendered), build the read-only dataset Glance mosaic per
+[dataset-glance.md](dataset-glance.md). It is a view, not an action surface; do
+not send the student back into it to review. Useful when you want to eyeball
+the whole set at once or gather subsets by search (`crop-applied`, `dup`,
+`watermark`) before committing to Phase 4.
+
 ### Validation gate before Phase 4
 
 Confirm:
@@ -331,6 +340,14 @@ Create `docs/planning/workstreams/<name>/progress.md` if the student's project i
 - The training brief sent to the student.
 
 This unblocks the parent chat (and you, on resume) from re-deriving context.
+
+### Publish the final set as a Glance mosaic (recommended)
+
+Build the dataset's read-only Glance mosaic ([dataset-glance.md](dataset-glance.md))
+once the set is final, and log the rebuild command in the progress doc. It is
+the browsable record of exactly what the LoRA trained on: finals only, crops as
+trained, captions on the card, dup families adjacent. Anyone asking "what is in
+the X dataset" gets a link instead of a folder listing.
 
 ## Failure modes and how you should react
 
