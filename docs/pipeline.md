@@ -359,3 +359,17 @@ Notes for the port:
 - Defaults `blend_pct=0.08`, `walk_rate=0.05` match the legacy entry-point standard mode. Calm passes `blend_pct=0.04`, `walk_rate=0.02`. Transition frames pass the per-position transition noise as `blend_pct`.
 
 `generate_crown_video.py` also re-exports `TRANSITION_STRENGTHS` and `TRANSITION_NOISE_RAMP` from `generate_videos.py` (it does not redefine them; it imports them at the top). The horizontal entry-point scripts import the names from `generate_crown_video`, so the dependency chain is `generate_horizontal -> generate_crown_video -> generate_videos`. As noted earlier, the horizontal scripts then ignore the ramp values they imported, so dropping `generate_crown_video` removes one indirection without changing behavior.
+
+## Phase A alternative: edit-model keyframes (validated 2026-08-12)
+
+Phase A's diffusion chain is no longer the only keyframe source. An image-EDIT model
+(Gemini image editing) can author the keyframes directly: a base frame plus sequential
+small-delta edits in which everything holds except the acting element, then Phase C
+(RIFE) interpolates as usual. This inverts the chain's economics: consistency is the
+default and change is authored, so the rubbery-morphing class of artefact is absent by
+construction. Two pieces built this way gate at the project's record scores.
+
+Operating procedure and boundaries (particulate media, wrap bridges, held beats, the
+% 64 resolution rule): `.claude/skills/edit-model-loop/SKILL.md`, with the evidence in
+[quality-first progress](planning/workstreams/quality-first/progress.md) L39 and L45.
+The diffusion chain remains the path where the LoRA's own drift IS the subject.

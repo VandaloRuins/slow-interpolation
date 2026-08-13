@@ -41,6 +41,8 @@ The first new body of work. Scope expanded 2026-05-15 to include offline-scope n
 
 **Which style carries the first release is an open question.** Renoir flowers was the original direction and the LoRA is trained and validated, but the release subject is under exploration rather than settled. This phase's deliverables (the LoRA, the dataset protocol, the noise work, the configs) stand on their own regardless of which style ships.
 
+> **Settled 2026-08-12:** the release direction for both the NYC billboard and the objkt labs release is the **Arendt Vita Activa series**: three clusters of 10-second loops (Labor / Work / Action), edited side by side into the long delivery file. The Renoir family is **parked** as release direction (its deliverables stand). Concept and time doctrine: `Ruins-agent/knowledge/research/arendt-vita-activa-series.md`; production state: [quality-first progress](planning/workstreams/quality-first/progress.md) L38 onward.
+
 - Build dataset under `datasets/renoir-flowers/` (102 paintings curated, captioned, CivitAI ZIP ready as of 2026-05-17).
 - Train the LoRA on CivitAI, same playbook as Thomas Cole. In flight in a separate chat.
 - Define 3 to 7 subjects (A/B/C/A prompts). Four templates scaffolded under `examples/configs/renoir/` as of 2026-05-17.

@@ -141,3 +141,5 @@ fewer-larger-masses result are unaffected. See quality-first L16.*
 
 ---
 *Counter-findings welcome. See [CONTRIBUTING.md](../../CONTRIBUTING.md) shape 4.*
+
+> **Instrument note (2026-08-11):** `tools/pulse_plot.py` and `tools/motion_profile.py`, referenced in this finding, are deprecated in place, superseded by `tools/analyse_render.py`. The validated instrument set, with noise floors and sensitivities, is [render-quality-instruments.md](render-quality-instruments.md).

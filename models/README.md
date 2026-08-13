@@ -33,3 +33,13 @@ if you want to point at the originals instead of duplicating.
 No sibling-folder dependencies. Configs that ship in this repo must reference
 either `models/loras/*` or HuggingFace IDs, never `../Choire/` or `../After Cole/`.
 See [docs/dependencies.md](../docs/dependencies.md).
+
+## Hammershoi Interiors (vhm) — added 2026-08-12
+
+`models/loras/Hammershoi_Interiors_epoch_{1..10}.safetensors` (also on the
+`slow-interp-loras` volume). Trigger `vhm`, default **epoch 10 at lora_scale 0.80**
+(chosen by instrument sweep on the SDXL-base backbone). Floral preset (rank 16 /
+alpha 8). Dataset: 115 public-domain works (SMK CC0 + Wikimedia Commons), curated by
+the maintainer through the dataset-mosaic gallery. **Caveat: the corpus contains no
+nocturnes; the LoRA renders night prompts as pale daylight.** Training config:
+`examples/configs/training/hammershoi_interiors.yaml`.

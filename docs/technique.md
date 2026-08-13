@@ -28,7 +28,7 @@ The first body of work built on this consolidated toolkit is **under exploration
 
 The original direction was a Renoir flowers LoRA used inside the same pipeline, and the reasoning behind it is worth keeping even though it is no longer the assumed answer. Impressionist floral painting is itself about slow perception: light changing on the same vase across an afternoon. Pairing it with a technique that refuses to settle gives a release a single legible thesis, a painter who tried to hold a moment run through a system that refuses to hold any.
 
-That thesis is a property of the pairing, not of Renoir specifically. Any style whose own subject is instability (light destroying form, paint behaving as weather) satisfies it. Which one carries the first release is the open question.
+That thesis is a property of the pairing, not of Renoir specifically. Any style whose own subject is instability (light destroying form, paint behaving as weather) satisfies it. Which one carries the first release is the open question. *(Resolved 2026-08-12: the first release is carried by the Arendt Vita Activa series, rendered in soft tonal prompt styles and the Hammershoi interiors LoRA, whose own subject, rooms held against time, satisfies the same thesis from the quiet side.)*
 
 ## Glossary
 
