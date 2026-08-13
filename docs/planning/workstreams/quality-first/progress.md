@@ -1371,6 +1371,27 @@ A LoRA cannot render a register it never saw. Consequence for the series:
 Chain params that worked and carry forward: drawn map at 0.65, full-bleed anchor at
 0.45 / warmup 1, base 40 steps, trim at delivery.
 
+### L45. Second triptych round: the snow ties the record, the dust names a boundary
+
+Staged per the temporal doctrine and critiqued before interpolation (SSIM ladder +
+semantic-velocity check + eye):
+
+| piece | staging | gate | verdict |
+|---|---|---|---|
+| `action_snow` (First Footprints) | marks accumulate, branch, snow erases; 10-frame held beat | **9/10/9/8, zero flags** | ties the project record; the natality image works |
+| `work_chair2` (single-pass care) | ONE act, hand present from frame 0, closure = the gesture returning | 8/9/6/9, eye-passed | the over-plotting law applied and confirmed |
+| `labor_sweep` | broom through a light shaft, dust cycle | FAIL motion 4 | **boundary found: RIFE cannot invent particulate motion.** Dust morphs as blobs; fine stochastic media (dust, snowfall-as-particles, spray) must be painted per-keyframe as STATES, not asked of the interpolator |
+
+Luca's live curation swept the field to a pure Arendt set (six pieces, all
+LED-wall and vhm experiments removed): the series IS the work now.
+
+**Validated this arc, for the record:** the edit-model keyframe loop end to end
+(4 of 7 pieces gate-passed, two at 9/10/9/8); drawn ControlNet maps over derived
+ones (third confirmation); anchored base chains with full-bleed anchors; the
+keeper-floor gate with mandatory eye signoff; curation_sync apply-always (the
+check-then-export pattern was bypassed twice by shell pipelines eating exit
+codes; always `--apply` before export, it is idempotent).
+
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 
 - **`tools/glance_curate.js`**: the tier-0 curate face lost every mark on exit,
