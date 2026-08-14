@@ -47,6 +47,25 @@ EDIT_PREAMBLE = (
     "lighting, the palette, the brushwork, the camera. Change ONLY this: {change}. "
     "The result must look like the SAME painting a moment later.")
 
+# Appended to every base prompt, because the model volunteers two things that no
+# amount of "no text" in a hand-written prompt reliably suppresses, and both are
+# inherited by every sequential edit and every bridge once they are in frame 0.
+#
+# Measured 2026-08-14 on two chains: `work_kiln` came back with a fabricated
+# cursive artist signature in the bottom-right corner of all ten states, which is
+# another artist's name on a Vandalo Ruins piece and had to be median-patched out
+# and re-rendered. `labor_vert_steps` came back painted as a CANVAS, woven edge and
+# tacking margin included, on all four sides of every state, which the gate caught
+# as a border flag and which could only be fixed by re-authoring the base.
+#
+# The base is the only lever that matters: fix frame 0 and the whole chain is clean.
+BASE_SUFFIX = (
+    " CRITICAL, and this applies to the whole image: the painted scene fills the "
+    "ENTIRE frame right to all four edges. There is NO canvas edge, NO woven or "
+    "frayed canvas texture, NO tacking margin, NO frame, NO border and NO mount "
+    "anywhere. There is NO signature, NO artist's name, NO monogram, NO lettering, "
+    "NO writing and NO text anywhere in the image.")
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -61,6 +80,11 @@ def main():
                     help="sequential edit; repeatable, one per keyframe")
     ap.add_argument("--out", required=True)
     ap.add_argument("--model", default="gemini-3.1-flash-image")
+    ap.add_argument("--no-base-suffix", action="store_true",
+                    help="do NOT append BASE_SUFFIX to the base prompt. Only for a "
+                         "piece that genuinely wants a visible canvas edge or "
+                         "lettering; the default exists because the model volunteers "
+                         "a signature and a painted canvas border otherwise.")
     # The dual-image bridge. Sequential edits are BLIND to any frame but the
     # previous one, so an edit asked to "return to the start" drifts and a large
     # transition asked to happen in one step lands as a jump. Handing the model
@@ -107,7 +131,8 @@ def main():
             f"Paint the exact in-between moment, {a.bridge_at} from the first to "
             "the second. Keep the setting, the composition, the camera and the "
             "brushwork identical to both; only the changing element should sit "
-            "between its two states. Do not invent anything present in neither.")
+            "between its two states. Do not invent anything present in neither. "
+            "Do not add a signature, lettering, text, a border or a canvas edge.")
         out.parent.mkdir(parents=True, exist_ok=True)
         img = gen([first, second, prompt], out)
         print(f"{out.name}  {img.size}  (bridge {a.bridge_at}: "
@@ -123,8 +148,10 @@ def main():
         cur.save(out / "0000.png")
         print(f"0000.png  {cur.size}  (reused from {a.base_image}, not generated)")
     else:
-        cur = gen([a.base], out / "0000.png")
-        print(f"0000.png  {cur.size}")
+        base_prompt = a.base if a.no_base_suffix else a.base + BASE_SUFFIX
+        cur = gen([base_prompt], out / "0000.png")
+        print(f"0000.png  {cur.size}"
+              f"{'  (base suffix OFF)' if a.no_base_suffix else ''}")
     sizes.append(list(cur.size))
     for i, change in enumerate(a.edit, start=1):
         cur = gen([cur, EDIT_PREAMBLE.format(change=change)], out / f"{i:04d}.png")
@@ -139,6 +166,7 @@ def main():
     (out / "manifest.json").write_text(json.dumps({
         "model": a.model,
         "base": a.base,
+        "base_suffix": None if a.no_base_suffix else BASE_SUFFIX,
         "base_image": a.base_image,
         "edits": a.edit,
         "edit_preamble": EDIT_PREAMBLE,
