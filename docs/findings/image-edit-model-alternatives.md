@@ -1,12 +1,15 @@
 # Replacing nano banana: open-weight instruction image editors
 
-**Status: researched 2026-08-13, NOT yet tested. Four independent research passes.**
-**Next action: the Modal bake-off in [kickoff-editor-migration.md](../planning/kickoff-editor-migration.md).**
+**Status: researched 2026-08-13, bake-off run on Modal 2026-08-14.**
+**Result: two candidates eliminated on the painterly gate, one still open. Jump to
+[section 10](#10-bake-off-results-2026-08-14) for the verdicts; sections 1-9 are the
+research that set the test up and are unchanged.**
 
 You are an agent picking up the question "what replaces `gemini-3.1-flash-image`
-(nano banana) as the keyframe editor". This page is the evidence. It does not tell you
-which model to use, because **no benchmark measures the thing that decides it for this
-project**, and nobody has run the test yet.
+(nano banana) as the keyframe editor". Sections 1-9 are the evidence that framed the
+question; section 10 is what happened when the three candidates were actually run.
+**No benchmark measures the thing that decides it for this project**, which is why the
+probe exists.
 
 ---
 
@@ -214,3 +217,180 @@ Edit2Interp (arXiv 2603.15003) · FireRed-Image-Edit (arXiv 2602.13344, github.c
 Mage-Flow (arXiv 2607.19064, Comfy-Org/Mage-Flow) · FLUX.2 klein (bfl.ai, black-forest-labs/FLUX.2-klein-4B) ·
 Qwen-Image issue #243 (square-resolution degradation) · QuantStack GGUF discussion #6 (quantisation ghosting) ·
 Tongyi-MAI/Z-Image (Z-Image-Edit unreleased)
+
+---
+
+## 10. Bake-off results (2026-08-14)
+
+Run on Modal from [`cloud/edit.py`](../../cloud/edit.py), one resident container per
+candidate, seed 1087 throughout. Source frames are current Arendt-series work, not the
+Thomas Cole material: `labor_embers/keyframes/0000.png` (1408x768, gated 10/10/9/9),
+`ledA_window/accum/0000.png` (592x1792), `ledB_snow/accum/0000.png` (1856x576).
+
+### 10.1 Verdict table
+
+| candidate | Q1 painterly | Q2 exact dims | Q3 chain | Q4 bridge | status |
+|---|---|---|---|---|---|
+| FLUX.2 [klein] 4B | **FAIL** | pass (with `height`/`width`) | not run | not run | **eliminated** |
+| Mage-Flow-Edit-Turbo 4B | **FAIL** | **pass natively** | not run | not run | **eliminated** |
+| FireRed-Image-Edit 1.1 | marginal pass | pass (with `height`/`width`) | pending | pending | **only survivor** |
+
+Q1 is a stop gate, so nothing was spent on Q3 or Q4 for the two that failed it. That is
+the brief's own rule and it saved roughly 60% of the projected bake-off cost.
+
+### 10.2 Q1, the painterly gate: how it was measured
+
+Judging the whole frame is useless here, because most of it changes for legitimate
+reasons. The instrument that separates the candidates is a **704x384 1:1 crop of a
+region the edit did not name** (the stone pile and hearth at the bottom left of
+`labor_embers`, box `100,384` to `804,768`). Everything that moves in that crop is
+collateral damage.
+
+One edit, from the identical base, judged against the nano banana chain's own first
+edit on the same base:
+
+| candidate + prompt form | SSIM (untouched region) | lapvar ratio | warmth (dR-dB) |
+|---|---|---|---|
+| **nano banana (the reference)** | **0.870** | **1.21** | **+7.4** |
+| firered, bare imperative | 0.703 | 1.38 | +6.4 |
+| firered, full preamble | 0.674 | 1.28 | +3.9 |
+| mageflow, full preamble | 0.631 | 2.88 | +11.3 |
+| mageflow, bare imperative | 0.578 | 2.64 | +15.5 |
+| klein, full preamble | 0.487 | 2.15 | +28.3 |
+| klein, bare imperative | 0.467 | 1.50 | +38.3 |
+
+`lapvar ratio` is Laplacian variance after divided by before. It is the edge-crispening
+axis: 1.0 means the surface is as soft as it started, 2.0 means the model doubled the
+high-frequency energy of a region it was not asked to touch. `warmth` is mean red minus
+mean blue delta, the yellow-cast axis section 5 predicted.
+
+**What the numbers say, confirmed by eye at native resolution in every case:**
+
+- **klein repaints the frame and pours warm light over it.** The single instruction
+  "the embers brighten a little" produced open flames, a global amber wash roughly six
+  times nano banana's colour shift, and hard-edged chiselled stone where the original
+  had soft tonal masses. The preamble version additionally redrew the pot, the stove
+  interior and the door panel. Both documented failure modes, photorealism drift and
+  yellow cast, fire on edit one.
+- **Mage-Flow goes photographic, and it is the worst offender on surface.** lapvar 2.6
+  to 2.9 in an untouched region: the hearth ash becomes granular photographic grit,
+  charcoal gains specular highlights, stone edges harden. On the 592x1792 ledwall frame
+  it also put **visible directional brushstrokes in the sky** and outlined every stone
+  and ivy leaf. This is precisely the "painterly, unblended look" section 7 warned about,
+  and Luca has explicitly rejected that register.
+- **FireRed holds the palette.** Its warm shift is +6.4 against nano banana's +7.4, so
+  the yellow-cast problem simply does not appear. Crispening is mild (1.38 against 1.21).
+  What it does worse than nano banana is preservation: 0.703 against 0.870, below the
+  0.80 healthy floor on turn one, visible as hearth debris turning from soft smudges into
+  discrete hard-edged chips and as an invented bail handle on the pot.
+
+**Prompt-format answer, which the brief asked for explicitly:** the long "keep ABSOLUTELY
+EVERYTHING identical" preamble is **not** what buys preservation on these models, and for
+two of the three it actively hurts.
+
+| candidate | better form | why |
+|---|---|---|
+| firered | **bare imperative** | higher SSIM (0.703 vs 0.674); costs a little colour neutrality |
+| mageflow | **full preamble** | bare doubled the warm shift (+15.5 vs +11.3) |
+| klein | neither | the two forms differ by 0.02 SSIM; both fail |
+
+Use the bare form for FireRed. Do not port the Gemini preamble verbatim to any of them.
+
+### 10.3 Q2, exact dimensions: all three pass, but only with an override
+
+Assume silent resizing until disproved was the right posture. It is real, and it is
+overridable in every candidate.
+
+| candidate | no `height`/`width` passed | explicit `height`/`width` |
+|---|---|---|
+| klein | 1376x752 | exact 1408x768, 592x1792, 1856x576 |
+| firered | 1376x768 | exact 1408x768 |
+| mageflow | **1408x768, the native source size** | exact 1408x768, 592x1792, 1856x576 |
+
+Two things worth carrying forward whatever we end up using:
+
+1. **Always pass `height`/`width`.** Left to itself each diffusers-family candidate snaps
+   to a ~1 MP bucket. klein lands on 1376x752 and FireRed on 1376x768, and FireRed's
+   default is *exactly the size nano banana emits*, which is a neat confirmation that
+   everyone is quantising to the same 1 MP budget.
+2. **The output canvas is exact; the conditioning path is not.** Both diffusers
+   pipelines downsample the reference internally regardless of what you ask for:
+   `QwenImageEditPlusPipeline` resizes the VAE conditioning to
+   `calculate_dimensions(1024*1024, ratio)` and the semantic conditioning to a 384x384
+   *area*; `Flux2KleinPipeline` calls `_resize_to_target_area(img, 1024*1024)` on any
+   reference above 1 MP and then crops to a multiple of 16. Our frames are 1.06 to
+   1.08 MP, so every one of them takes a downsample-then-upsample round trip per edit.
+   Mage-Flow is the only candidate that does not do this (`vl_cond_long_edge` caps only
+   the reference fed to the text encoder), which is what its native-resolution claim
+   actually means. It is a pity it failed Q1, because on this axis it is the best of the
+   three.
+
+### 10.4 Corrections to sections 1-9, all measured
+
+Three claims in the research above are wrong and would mislead the next attempt.
+
+| claim in the research | what is actually true |
+|---|---|
+| FireRed is "20B, ~30 GB" and "all three fit L40S 48 GB at full precision" (section 8) | **57.7 GB of weights** (transformer 40.86 + text encoder 16.58) and **58.4 GB resident on an A100-80GB**. It does not fit L40S. The 30 GB on the model card is the quantised acceleration suite. Section 8's premise, that Modal removes the quantisation-risk class for all three, holds only if FireRed is given an 80 GB card. |
+| Mage-Flow ships as `Comfy-Org/Mage-Flow` because "the Microsoft original is gated" | `microsoft/Mage-Flow*` returns **404 even with a valid token**, and `Comfy-Org/Mage-Flow` is ComfyUI single-file format with no `model_index.json`, so diffusers cannot load it at all. Working route: the `mage_flow` package from **github.com/microsoft/Mage** (MIT, subdirectory `mage_flow`) plus a diffusers-layout community mirror such as `mage-flow-community/Mage-Flow-Edit-Turbo`. Provenance is a re-upload, not first-party; treat the MIT claim as inherited rather than verified. |
+| The kickoff sketch's image pins `transformers>=4.57` | Unresolvable. diffusers from git requires `huggingface-hub>=1.23`; every transformers 4.57.x caps `huggingface-hub<1.0`. Use `transformers>=5.5,<5.6`. |
+
+Two build traps worth recording, both of which cost a container start:
+
+- **Mage-Flow needs flash-attn switched off in two independent places.**
+  `set_attn_backend("sdpa")` covers the DiT only, and it must be called **after**
+  `from_pretrained`, because `MageFlowModel.__init__` calls
+  `set_attn_backend(config.attn_type)` itself and the repo config says `flash2`. The
+  Qwen3-VL text encoder is separate and is constructed with
+  `attn_implementation="flash_attention_2"` hard-coded; the env var
+  **`VF_HF_ATTN_IMPL=sdpa`** is the first-party override for it. With both set, the 4B
+  model loads in 28.6 s and needs no CUDA compile at all. Without them you are looking at
+  a 30 to 60 minute flash-attn source build inside an image layer.
+- **Weights live on a dedicated `slow-interp-edit-cache` volume**, not the shared
+  `slow-interp-hf-cache`, so roughly 100 GB of bake-off scratch can be dropped in one
+  command without touching the render path's SDXL and RIFE cache. Delete it when the
+  verdict lands.
+
+### 10.5 Measured economics
+
+| candidate | GPU | load | per edit | 10-keyframe chain |
+|---|---|---|---|---|
+| klein 4B | L40S | 78 s | **2.7 s** | ~0.06 USD |
+| mageflow 4B | L40S | 29 s | **3.2 s** | ~0.06 USD |
+| firered 20B | A100-80GB | 132 s | **54 s** (24 steps, true_cfg 4.0) | ~0.60 USD |
+| nano banana | n/a | n/a | metered | 0.67 USD |
+
+The 10x cost saving the brief hoped for is real **only for the 4B models**, and both of
+those failed Q1. FireRed at 24 steps with CFG costs roughly what nano banana costs, so if
+it wins it wins on sovereignty, reproducible seeds and exact dimensions, **not on price**.
+That changes the case for migrating and should be said plainly to Luca.
+
+### 10.6 What is still open
+
+FireRed is the only candidate still standing and its Q1 pass is marginal, so the decision
+rests entirely on Q3 (does preservation survive nine sequential edits) and Q4 (can it do
+the dual-endpoint bridge). Both are pending a budget decision: one dispatch covering Q2 on
+the two ledwall aspects, a 9-edit chain on `ledB_snow` reusing that chain's own documented
+edit list so turns 1 to 5 compare like for like against the nano banana frames on disk,
+and two bridge forms, is roughly **0.82 USD** on A100-80GB. That is above the 0.50 USD
+per-dispatch gate and needs Luca's go-ahead.
+
+One caveat to hold: FireRed was probed at 24 steps to control cost. It is not a distilled
+model, so a low step count is a plausible contributor to the crispening. If Q3 fails
+marginally, re-probe at 40 steps before condemning it. klein and Mage-Flow carry no such
+doubt: both are 4-step distilled models run at their card-documented settings, and their
+failure mode is over-execution and repainting, which more steps would not fix.
+
+### 10.7 Reference ladders, computed free from frames already on disk
+
+Consecutive SSIM over the nano banana chains, for anyone calibrating a candidate:
+
+| chain | frames | mean | min | wrap | note |
+|---|---|---|---|---|---|
+| `labor_embers` 1408x768 | 8 | **0.903** | 0.844 | 0.917 | the gated 10/10/9/9 piece; this is what healthy looks like |
+| `ledB_snow` 1856x576 | 6 | 0.830 | 0.664 | 0.651 | two mid-chain pairs already below the bridging threshold |
+| `ledA_window` 592x1792 | 6 | 0.429 | 0.401 | 0.258 | dusk-to-night; global SSIM is luminance-dominated here and is **not** a usable instrument |
+
+Do not use a chain like `ledA_window` to judge preservation. When every keyframe changes
+the global light level, SSIM measures the lighting change, not the drift. Use
+`labor_embers` or a masked comparison.
