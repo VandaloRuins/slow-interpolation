@@ -48,9 +48,9 @@ PROJECT_LINK = ROOT / ".glance-vercel.json"
 # repoint the main archive's project and one of the two stable URLs would die.
 CURATED_LINK = ROOT / ".glance-ledwall-vercel.json"
 
-# The viewer is a separate tool. Point at it with --glance or $GLANCE_HOME; the
-# default is the sibling checkout, which is where it lives on this machine.
-DEFAULT_GLANCE = ROOT.parent / "Ruins-Harness_Tools-for-Agents" / "glance"
+# The viewer is a separate tool. Point at it with --glance or $GLANCE_HOME.
+# This is a public repo, so no machine path and no sibling checkout name is
+# baked in here; there is deliberately no default.
 
 
 def proxy_for(key: str) -> Path | None:
@@ -141,8 +141,9 @@ def main() -> int:
                     help="a glance_export.py output dir")
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--glance", type=Path,
-                    default=Path(os.environ.get("GLANCE_HOME", DEFAULT_GLANCE)),
-                    help="the glance tool checkout (holds install.py + payload/)")
+                    default=Path(os.environ["GLANCE_HOME"]) if os.environ.get("GLANCE_HOME") else None,
+                    help="the glance tool checkout (holds install.py + payload/); "
+                         "required, or set GLANCE_HOME")
     ap.add_argument("--title", default="Slow Interpolation")
     ap.add_argument("--collection", default="renders")
     ap.add_argument("--fair-share", action="store_true", default=True,
@@ -184,6 +185,10 @@ def main() -> int:
     if not cat_path.is_file():
         print(f"no export at {args.export}\n  run: python tools/glance_export.py "
               f"--no-frames --dest {args.export.relative_to(ROOT)}", file=sys.stderr)
+        return 1
+    if args.glance is None:
+        print("glance tool location unknown\n"
+              "  pass --glance <dir> or set GLANCE_HOME", file=sys.stderr)
         return 1
     installer = args.glance / "install.py"
     if not installer.is_file():
