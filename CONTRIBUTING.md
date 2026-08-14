@@ -21,7 +21,7 @@ If your contribution does not match one of these, open an issue first and we'll 
 1. **Fork** the repo on GitHub.
 2. **Branch** from `main`. Branch name: `<shape>-<short-slug>`. Examples: `finding-cezanne-lora`, `noise-curl-2d`, `compositing-depth-prior`, `manual-amd-rocm`.
 3. **Commit small.** One coherent change per commit. Commit messages: imperative present (`add Cezanne LoRA finding`, not `added` or `adding`).
-4. **Tests pass.** `python -m pytest tests/ -q` is the bar. New code adds new tests; the existing 55 tests must stay green.
+4. **Tests pass.** `python -m pytest tests/ -q` is the bar. New code adds new tests; the existing 76 must stay green. That run reports 75 passed and 1 skipped: `tests/test_modal_contract.py` skips the cloud subpackage unless you installed the `[cloud]` extra, which is expected. CI runs a 70-test subset that ignores that file entirely.
 5. **No em dashes** in any text you write into the repo. Use commas, periods, or "to" for ranges. This is a stylistic constraint of the original author; it keeps the prose consistent across forks.
 6. **No sibling-folder dependencies.** `python -m pytest tests/test_no_sibling_paths.py` must pass. It covers `src/`, `vendor/`, `tools/`, `datasets/`, `docs/`, `.github/` and `.claude/`, and bans absolute machine paths, live parallel-project names, and `Choire`/`After Cole` inside code directories. Documenting the lineage in `docs/` is fine.
 7. **Update the docs map.** If you added a file under `docs/`, add it to `docs/README.md` in the same PR.
@@ -100,7 +100,7 @@ This is Python 3.11+. The package uses:
 
 - `dataclasses` for configs (no Pydantic).
 - `numpy` for numeric work, `PIL` for image I/O.
-- `pytest` for tests. No `unittest`. No mocks for I/O; the existing tests run in <2 seconds without GPU.
+- `pytest` for tests. No `unittest`. No mocks for I/O; the existing tests run in a few seconds without GPU. Keep it that way: a test that needs a GPU, a network call or a model download does not belong in `tests/`.
 - Type hints where they aid clarity. `from __future__ import annotations` at the top of every file.
 - Black-compatible formatting (line length 100 acceptable). No formatter enforced; aim for clarity over uniformity.
 
