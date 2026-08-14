@@ -58,7 +58,7 @@ def check_packages():
             record(OK, f"package {mod}", why)
         except Exception:
             hard_ok = False
-            record(FAIL, f"package {mod}", f"MISSING -- {why}. pip install -r requirements.txt")
+            record(FAIL, f"package {mod}", f"MISSING -- {why}. pip install -e .[archive]")
     for mod, why in OPTIONAL:
         try:
             importlib.import_module(mod)

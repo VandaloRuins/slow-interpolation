@@ -52,6 +52,15 @@ dev = [
 # Modal SDK is intentionally NOT in core dependencies: users who never
 # run the cloud path do not pull this in.
 cloud = ["modal>=0.66"]
+# R2 media archive (tools/media_store.py, tools/media-engine/ingest.py,
+# tools/media_query.py). boto3 and botocore are the HARD requirements, checked
+# by tools/media_archive_verify.py; duckdb/pandas/pyarrow are what the
+# documented search and KB-export workflows actually need, so the extra
+# installs something usable rather than something that imports.
+# Deliberately NOT here: lancedb (similarity search) and google-genai (VLM
+# captions), which stay opt-in. PIL and yaml come from core (pillow, pyyaml).
+# Not in `dev`: CI does not exercise the archive path and should not pay for it.
+archive = ["boto3", "botocore", "duckdb", "pandas", "pyarrow"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
