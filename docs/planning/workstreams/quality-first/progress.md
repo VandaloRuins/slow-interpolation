@@ -1131,8 +1131,34 @@ axis the whole seamlessness effort targeted.
 
 ### L35. The anchored base chain: Lightning seeds, base sustains
 
-`led22_*_anchor` runs the base backbone from a sharp Lightning keyframe
-(`anchor_image` at `anchor_strength: 0.45`, `warmup: 1` per L17). Results:
+> **CORRECTION 2026-08-14, and it takes the headline with it.** The anchor NEVER
+> LOADED in any `led22_*_anchor` run. All four nest `anchor_image` under `render:`,
+> and the loader reads it at root (`config.py:521`), so `keyframes.py:404` started
+> every one of them from NOISE. **There was no Lightning seed and no anchored base
+> chain.** The title of this learning describes a mechanism that has never run.
+>
+> The measurements below are real; the ATTRIBUTION is wrong. Every anchored config
+> also carries `warmup: 1` while every unanchored sibling carries `warmup: 3`, so
+> the two are perfectly confounded and only `warmup` was ever live. The honest
+> reading of the ramp collapse (Cole 4.16x to 1.66x, Casa 1.69x) is therefore
+> **`warmup: 1` alone does it**, which is a cheaper lever than anchoring and needs
+> no anchor hygiene. The keyframe-agreement figure (Cole 0.849 vs Lightning 0.332)
+> is a base-vs-Lightning comparison and is unaffected.
+>
+> Two bullets below survive intact because they never depended on the anchor: the
+> `return_pixel_blend_max` result (led23) and the morph result (led24). One bullet
+> is now **unsupported**: "an anchor carries its defects into the chain". The
+> `led22_renoir_anchor` canvas edge came back from somewhere else, most likely the
+> LoRA, since no anchor was read; do not cite it as anchor hygiene.
+>
+> **What this leaves open:** the anchored base chain is UNTESTED, not refuted, and
+> it is now cheap to test properly. Hoist the key to root in one config, confirm the
+> container logs `[keyframes] seeded from ... at strength 0.45`, and hold `warmup: 1`
+> fixed so the anchor is the only variable. That log line is the only proof an
+> anchor loaded; its absence is what hid this for a month.
+
+`led22_*_anchor` was INTENDED to run the base backbone from a sharp Lightning keyframe
+(`anchor_image` at `anchor_strength: 0.45`, `warmup: 1` per L17). Results as measured:
 
 - **The warm-up ramp collapses where the anchor is clean**: Cole 4.16x to 1.66x,
   Casa to 1.69x. Keyframe agreement doubles or better (Cole 0.849 vs Lightning's
@@ -1180,7 +1206,8 @@ Gemini's image 8. Two rules follow:
 **On the Cole underdevelopment, the diagnosis is L30's trade seen from the other
 side.** kf_ssim was optimised to 0.849 at strength 0.35, and that agreement was
 bought by under-painting: a chain that barely repaints barely develops. The anchored
-chain fixed the ramp but capped detail at 8 real steps per keyframe. Development
+chain (read `warmup: 1` chain, per the L35 correction of 2026-08-14: no anchor ever
+loaded) fixed the ramp but capped detail at 8 real steps per keyframe. Development
 needs steps, agreement needs small strength; the two are the same dial only at fixed
 step count, so the next lever is `num_inference_steps` up at strength held low,
 which raises steps-per-keyframe without raising drift. Untested.
@@ -1193,9 +1220,12 @@ Eye inspection ran FIRST this time, before any Gemini spend.
 - **Development recovered on Renoir**: `led25_renoir_peony`'s opening frames show formed
   petal structure inside what used to be the warm-up haze. The 14-step recipe fixes the
   underdevelopment Luca called out, on this LoRA.
-- **It did NOT recover Cole** (`led25_cole_steps` still washed out). The anchored-base
-  recipe is refuted on Cole at any tested steps; Cole currently has no working base
-  recipe. Chrys and wisteria stayed milky: subjects whose detail is fine-grained
+- **It did NOT recover Cole** (`led25_cole_steps` still washed out). The recipe is
+  refuted on Cole at any tested steps; Cole currently has no working base recipe.
+  **Do not call this "the anchored-base recipe" (correction 2026-08-14):**
+  `led25_cole_steps` is one of the 11 configs whose `anchor_image` never loaded, so
+  what is refuted on Cole is the `warmup: 1` base recipe, unanchored. A genuinely
+  anchored Cole render has never been run. Chrys and wisteria stayed milky: subjects whose detail is fine-grained
   (small blooms, clusters) need more than 14 steps or more strength; the close-up
   peony resolved because its forms are large.
 - **The canvas edge is STRENGTH-bound, not steps-bound.** led19 at 0.46/11 real steps:
@@ -1440,11 +1470,23 @@ codes; always `--apply` before export, it is idempotent).
 **Two reversals of earlier guidance:**
 
 - **`anchor_image` must sit at YAML ROOT.** Nested under `render:` it is silently ignored.
-  This rewrites L44 (corrected in place above): v3's anchor never loaded. Audited
-  2026-08-13, the ONLY affected config is `examples/configs/arendt/action_vhm3.yaml`; the
-  four `work_chair_*` configs carry it at root correctly. The broken config is LEFT AS IT
-  RAN, because a config is the canonical record of its own render; the correction lives in
-  its comment.
+  This rewrites L44 (corrected in place above): v3's anchor never loaded. The broken
+  configs are LEFT AS THEY RAN, because a config is the canonical record of its own
+  render; the correction lives in each one's comment.
+
+  **RE-AUDIT 2026-08-14: the 2026-08-13 audit was wrong, and by a lot.** It recorded
+  `arendt/action_vhm3.yaml` as the ONLY affected config. The real count is **11**, found
+  by parsing every YAML rather than reading the ones already suspected:
+  `arendt/action_vhm{,2,3}.yaml`, `nyc-billboard/led22_{casa,cole,renoir,soutine}_anchor.yaml`,
+  `led23_cole_return.yaml`, `led24_cole_still.yaml`, `led25_cole_steps.yaml`,
+  `led28_stn_anchored.yaml`. The four `work_chair_*` configs do carry it at root and are
+  fine. **`anchor_strength` is read at root too** (`config.py:523`), so in all 11 both keys
+  were inert. **Every config that names an anchor in this repo, except the four
+  `work_chair_*`, ran without one.** See the L35 correction: this is not a documentation
+  problem, it invalidates a learning.
+
+  Re-run the audit this way, not by eye:
+  `python -c "import glob,yaml; [print(p) for p in sorted(glob.glob('examples/configs/**/*.yaml',recursive=True)) if (lambda d: isinstance(d,dict) and 'anchor_image' in (d.get('render') or {}) and 'anchor_image' not in d)(yaml.safe_load(open(p,encoding='utf-8')))]"`
 - **`minterpolate mci` is refused for retiming** (reverses L40). It is block-based and
   smears painterly content: `grow_farmhouse` FAILED at image 7 under mci and PASSED
   9/10/9/9 re-encoded from the same frames with plain frame-drop. Densify keyframes rather

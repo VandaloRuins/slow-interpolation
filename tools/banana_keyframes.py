@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import io
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,11 +50,30 @@ EDIT_PREAMBLE = (
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base", required=True, help="prompt for keyframe 0000")
+    ap.add_argument("--base", help="prompt for keyframe 0000")
+    ap.add_argument("--base-image", dest="base_image",
+                    help="reuse an existing PNG as keyframe 0000 instead of generating "
+                         "one. Use this to re-author the TAIL of a chain whose early "
+                         "keyframes are good: paying to regenerate validated frames also "
+                         "re-rolls them, and a validated frame is worth more than the call "
+                         "it costs. Mutually exclusive with --base.")
     ap.add_argument("--edit", action="append", default=[],
                     help="sequential edit; repeatable, one per keyframe")
     ap.add_argument("--out", required=True)
     ap.add_argument("--model", default="gemini-3.1-flash-image")
+    # The dual-image bridge. Sequential edits are BLIND to any frame but the
+    # previous one, so an edit asked to "return to the start" drifts and a large
+    # transition asked to happen in one step lands as a jump. Handing the model
+    # BOTH endpoints and asking for the moment between is what closed
+    # action_chairs' wrap 0.758 -> 0.953 and repaired four chains in one day.
+    # It was doctrine before it was reachable from the CLI.
+    ap.add_argument("--bridge", nargs=2, metavar=("FROM", "TO"),
+                    help="two image paths; writes ONE in-between frame to --out "
+                         "(a file path, not a directory). Use for a wrap seam or "
+                         "any transition too large for one sequential step.")
+    ap.add_argument("--bridge-at", default="halfway",
+                    help="where between the two the moment sits: 'halfway', "
+                         "'one third of the way', 'two thirds of the way'")
     a = ap.parse_args()
 
     spec = importlib.util.spec_from_file_location("gr", ROOT / "tools" / "gemini_review.py")
@@ -65,7 +85,8 @@ def main():
 
     client = genai.Client(api_key=gr.api_key())
     out = Path(a.out)
-    out.mkdir(parents=True, exist_ok=True)
+    if not a.bridge:
+        out.mkdir(parents=True, exist_ok=True)
 
     def gen(contents, path):
         r = client.models.generate_content(
@@ -79,11 +100,51 @@ def main():
         texts = [getattr(p, "text", "")[:120] for p in r.candidates[0].content.parts]
         raise RuntimeError(f"no image returned for {path.name}: {texts}")
 
-    cur = gen([a.base], out / "0000.png")
-    print(f"0000.png  {cur.size}")
+    if a.bridge:
+        first, second = (Image.open(p).convert("RGB") for p in a.bridge)
+        prompt = (
+            "These two images are the SAME painting at two different moments. "
+            f"Paint the exact in-between moment, {a.bridge_at} from the first to "
+            "the second. Keep the setting, the composition, the camera and the "
+            "brushwork identical to both; only the changing element should sit "
+            "between its two states. Do not invent anything present in neither.")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        img = gen([first, second, prompt], out)
+        print(f"{out.name}  {img.size}  (bridge {a.bridge_at}: "
+              f"{Path(a.bridge[0]).name} -> {Path(a.bridge[1]).name})")
+        return
+
+    if bool(a.base) == bool(a.base_image):
+        raise SystemExit("pass exactly one of --base or --base-image")
+
+    sizes = []
+    if a.base_image:
+        cur = Image.open(a.base_image).convert("RGB")
+        cur.save(out / "0000.png")
+        print(f"0000.png  {cur.size}  (reused from {a.base_image}, not generated)")
+    else:
+        cur = gen([a.base], out / "0000.png")
+        print(f"0000.png  {cur.size}")
+    sizes.append(list(cur.size))
     for i, change in enumerate(a.edit, start=1):
         cur = gen([cur, EDIT_PREAMBLE.format(change=change)], out / f"{i:04d}.png")
+        sizes.append(list(cur.size))
         print(f"{i:04d}.png  {cur.size}")
+
+    # Manifest. Without this the prompts are unrecoverable, which on 2026-08-14
+    # made it impossible to re-run three photographic chains changing only the
+    # style clause: the originals were gone and had to be re-authored from
+    # scratch. The keyframes are the record of the render; this is the record of
+    # the keyframes. No key or secret is written here.
+    (out / "manifest.json").write_text(json.dumps({
+        "model": a.model,
+        "base": a.base,
+        "base_image": a.base_image,
+        "edits": a.edit,
+        "edit_preamble": EDIT_PREAMBLE,
+        "sizes": sizes,
+    }, indent=2), encoding="utf-8")
+
     print(f"{1 + len(a.edit)} keyframes in {out}. Eye them BEFORE interpolating.")
 
 

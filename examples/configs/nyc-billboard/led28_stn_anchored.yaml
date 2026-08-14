@@ -1,3 +1,16 @@
+# !! CORRECTION 2026-08-14, DO NOT "FIX" THE KEYS BELOW !!
+# `anchor_image` AND `anchor_strength` are nested under `render:` in this file, and
+# the loader reads BOTH at the YAML ROOT (`config.py:521-523`: `raw.get(...)`). So
+# `config.anchor_image` was None and `keyframes.py:404` started this render from
+# NOISE: the anchor described below NEVER LOADED. The container log for this run
+# carries no `[keyframes] seeded from ... at strength` line, which is the tell.
+# This render is therefore UNANCHORED, and its results are confounded with the
+# `warmup: 1` it also carries (every unanchored sibling runs `warmup: 3`).
+# The keys are left exactly as they ran, because a config is the canonical record
+# of its own render and hoisting them now would falsify it. New configs put
+# `anchor_image` at ROOT (see `arendt/work_chair_vhm.yaml`) and verify the log line.
+# Full context: quality-first progress.md L35 correction + L46.
+#
 # LED wall, 16:5 band, seed 1087.
 #
 # led28: THE KEEPER DISCIPLINE RESTORED. Luca 2026-08-12: the tcole outputs read
