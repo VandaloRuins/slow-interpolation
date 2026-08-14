@@ -1368,8 +1368,15 @@ A LoRA cannot render a register it never saw. Consequence for the series:
   raking window light, the woman at her task). The chair piece IS a Hammershoi
   subject. Point the LoRA there next.
 
-Chain params that worked and carry forward: drawn map at 0.65, full-bleed anchor at
-0.45 / warmup 1, base 40 steps, trim at delivery.
+Chain params that worked and carry forward: drawn map at 0.65, base 40 steps, trim at
+delivery.
+
+**CORRECTION 2026-08-13 (see L46):** the "full-bleed anchor at 0.45 / warmup 1" half of
+this recipe **never loaded**. `action_vhm3.yaml` nests `anchor_image` under `render:`,
+but the loader reads it at the YAML ROOT, so `config.anchor_image` was `None` and
+`keyframes.py` started from noise. Everything v3 achieved was carried by the DRAWN MAP
+ALONE, which strengthens the control-map lesson and removes any evidence for the anchor
+half. Do not carry the anchor claim forward from here.
 
 ### L45. Second triptych round: the snow ties the record, the dust names a boundary
 
@@ -1391,6 +1398,78 @@ ones (third confirmation); anchored base chains with full-bleed anchors; the
 keeper-floor gate with mandatory eye signoff; curation_sync apply-always (the
 check-then-export pattern was bypassed twice by shell pipelines eating exit
 codes; always `--apply` before export, it is idempotent).
+
+### L46. The production day: four rules, two mechanics, and two reversals
+
+2026-08-13. ~20 pieces built, gated and published across all three clusters. Records set:
+`labor_embers` 10/10/9/9 (the gate's own worst-case line read "no discernible defects"),
+`labor_vert_wipe` 10/10/9/9, `work_chair_slow_trim` 9/10/10/9 (**the project's first motion
+10**), `labor_vert_halo` 10/10/7/9, `grow_farmhouse` 9/10/9/9.
+
+**Four rules, all from Luca, all now in the `edit-model-loop` skill:**
+
+1. **No human hands, ever.** Objects, places, at most crowds. "It does not convert well,
+   while the chair slowly aging by itself looked very promising." Hands at a task read as
+   demonstration, not duration; the concept carries when the OBJECT bears the time.
+2. **Environmental coherence.** When time alters the subject, the surround must register
+   the same passage proportionally. Diagnosed from `grow_well`, where vegetation took the
+   well while the garden stood exempt: that reads as an effect applied to an object, not as
+   time passing through a place. `grow_well2` reworked it and gated 9/10/6/8 with unanimous
+   judges.
+3. **Stage transitions densely.** Every large light or state transition gets 2-3 authored
+   keyframes, not one plus a reactive tween. Every single-keyframe transition this session
+   needed a tween afterwards anyway.
+4. **Fluidity is the standing objective.** The loop must read as ONE continuous movement,
+   never as interpolation between staged frames. More keyframes with smaller deltas beats
+   fewer with big ones.
+
+**Two mechanics that repair chains:**
+
+- **The dual-image return leg.** Sequential edits are BLIND to frame 0, so a "return to the
+  start" instruction drifts (chairs never reset, textures accumulate as swirl, a night pane
+  grew a moon that was never there). Hand the model the previous keyframe AND frame 0 and
+  ask for the in-between at thirds. Wraps recovered: `action_chairs` 0.758 to 0.953,
+  `labor_dishes` 0.736 to 0.837, `labor_breath` 0.696 to 0.967, `vert_facade` 0.589 to
+  0.929. Four chains in one day.
+- **Palindrome closure for reversible phenomena.** When the authored return will not
+  converge on frame 0 (the model kept redrawing a wiped circle at a different size), build
+  the return from the accumulation states IN REVERSE. The seam becomes pixel-exact. Bought
+  loop 10 on both `labor_vert_wipe` and the three path verticals. Conceptually right for
+  Labor, where nothing accumulates.
+
+**Two reversals of earlier guidance:**
+
+- **`anchor_image` must sit at YAML ROOT.** Nested under `render:` it is silently ignored.
+  This rewrites L44 (corrected in place above): v3's anchor never loaded. Audited
+  2026-08-13, the ONLY affected config is `examples/configs/arendt/action_vhm3.yaml`; the
+  four `work_chair_*` configs carry it at root correctly. The broken config is LEFT AS IT
+  RAN, because a config is the canonical record of its own render; the correction lives in
+  its comment.
+- **`minterpolate mci` is refused for retiming** (reverses L40). It is block-based and
+  smears painterly content: `grow_farmhouse` FAILED at image 7 under mci and PASSED
+  9/10/9/9 re-encoded from the same frames with plain frame-drop. Densify keyframes rather
+  than the encode; `tpad=stop_mode=clone` covers an exact-300 shortfall invisibly.
+
+**Registers that convert (Luca, explicit):** light events (windows lighting, embers
+breathing, light crossing a room), overgrowth takeover, day/night cycles layered onto a
+composition ("it feels more like a timelapse"), and the frosted-glass verticals. Window
+pieces are "flawless" as a class. Vertical spec for IG carousel is **1024x1280**.
+
+**Post-processing, first experiments (DT17).** Three passes built and published as A/B
+pairs against `labor_embers`, awaiting Luca's verdict. C1 sharpness equalization aims at
+the keyframe-cadence pulse behind the "steps" feel; the research recipe (one global median
+target) had to be corrected to a wrap-padded ROLLING median, because a global target fought
+the piece's own arc and produced a violent sawtooth. A1 canvas overlay needed its weave
+coarsened from ~7px (which printed a visible dot screen and crushed the darks) to 24-31px
+at 0.10 strength. B1 is a phase-locked bloom on a warm-luminance mask.
+
+**Ended blocked:** the Gemini prepayment credit depleted mid-production, stopping both
+keyframe generation AND `review_gate.py` (scoring runs on Gemini too). Research into
+open-weight replacements is complete and landed at
+[findings/image-edit-model-alternatives.md](../../../findings/image-edit-model-alternatives.md),
+with a Modal-only migration brief at
+[planning/kickoff-editor-migration.md](../../kickoff-editor-migration.md). Tracked as PL17.
+
 
 ### Cross-workstream, for `/ingest` to route (NOT this workstream's zone)
 

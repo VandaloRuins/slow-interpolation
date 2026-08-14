@@ -61,8 +61,15 @@ RIFE via `slow_interpolation.interpolation.RIFEInterpolator`, `n_passes=5`,
 last keyframe before the wrap pair (the held beat).
 
 Encode: `-framerate <total/10> -vf fps=30 -frames:v 300`. Slight duplication is
-invisible; frame-DROP ratios near 1.5 are the documented judder. For long chains
-(400+ frames) retime with minterpolate mci instead.
+invisible; frame-DROP ratios near 1.5 are the documented judder.
+
+**Do NOT reach for `minterpolate mci` on long chains** (this reverses the earlier
+guidance, measured 2026-08-13). It is block-based motion compensation and it smears
+soft painterly content: `grow_farmhouse` FAILED the gate at image 7 under mci and
+PASSED **9/10/9/9** re-encoded from the same frames with plain frame-drop. If a chain
+is long enough to worry about, densify the KEYFRAMES rather than the encode. Where an
+exact-300 needs a nudge, `tpad=stop_mode=clone:stop=N` clones a tail frame, which is
+invisible on a slow loop.
 
 ## 5. Gate, then eyes, then publish
 
@@ -72,6 +79,12 @@ invisible; frame-DROP ratios near 1.5 are the documented judder. For long chains
 - Eye signoff is mandatory and means files were OPENED: both edge strips, a
   native-res mid-loop frame, and the worst-flagged moment. Then
   `review_gate.py --signoff <clip> --edges-clean --detail-ok`.
+- **Name the file notion-first**: `labor_*`, `work_*`, `action_*`. The gallery
+  clusters by the Arendt notion in the STEM (`glance_export.py --cluster-by notion`),
+  so a motif name like `grow_well2` or `vert_facade` lands in `unsorted`. Measured
+  2026-08-13: 14 assets stranded that way in one day. Assets are keyed by path, so a
+  later rename mints a new key and resurrects anything excluded under the old one:
+  name it right at birth.
 - Publish EVERYTHING new (Luca curates from his phone; failures stay visible with
   verdicts recorded): `python tools/curation_sync.py --apply` (ALWAYS apply before
   export, never check-then-export: shell pipelines ate the check's exit code twice)
@@ -80,6 +93,33 @@ invisible; frame-DROP ratios near 1.5 are the documented judder. For long chains
 
 ## Known boundaries (do not rediscover)
 
+- **No human hands, ever** (Luca, 2026-08-13). Objects and places, at most
+  crowds; never hands active in a task ("it does not convert well, while the
+  chair slowly aging by itself looked very promising"). The acting element is
+  the thing itself: the chair, the light, the cloth, the chairs-as-crowd.
+  Hand chains also carry a measured aging drift (smooth hands turn veined over
+  8+ sequential edits and never return).
+- **Sequential edits are blind to frame 0**, so a "return to the start" edit
+  drifts (chairs never reset, textures accumulate as swirl). Author the return
+  leg with MULTI-image edits: hand the model the previous keyframe AND frame 0
+  and ask for the in-between at one/two thirds. This closed action_chairs'
+  wrap from 0.758 to 0.953 and labor_dishes' from 0.736 to 0.837 in one pass
+  each.
+- **Stage transitions densely** (Luca, 2026-08-13): any large light or state
+  transition (dusk to night, night to dawn, peak to first-return) gets 2-3
+  authored keyframes of its own, not one step plus a reactive tween. Every
+  single-keyframe transition this far has needed a tween after the fact.
+- **The standing objective is fluidity** (Luca, 2026-08-13): the loop should
+  read as ONE continuous movement, never as interpolation between staged
+  frames. More keyframes with smaller deltas beats fewer with big deltas;
+  even semantic velocity per pair matters more than any individual frame.
+- **Environmental coherence** (Luca, 2026-08-13, from grow_well): when time
+  alters the subject (overgrowth, weathering, aging), the SURROUND must
+  register the same passage, proportionally. Name it in the edits themselves
+  ("the beds swelling, the gravel narrowing under moss") or the subject ages
+  inside a frozen world and the result reads as an effect on an object, not
+  as time passing through a place. Light-cycle pieces satisfy this for free
+  (the light touches everything); object-in-landscape pieces do not.
 - **RIFE cannot invent particulate motion.** Dust, spray, snowfall-as-particles
   morph as blobs (`labor_sweep`, motion 4). Author such media as per-keyframe
   STATES (settled / lifted / settled), or avoid.
@@ -87,7 +127,13 @@ invisible; frame-DROP ratios near 1.5 are the documented judder. For long chains
   dusk facade stayed daylight). Check the corpus before promising a register.
 - **A caption prior is a composition force**: vhm's "bare walls" erased a window
   grid that an anchor alone was pinning. The fix is a DRAWN ControlNet map (three
-  derived maps failed; drawn won immediately) at scale 0.65 with a full-bleed
-  anchor at 0.45, warmup 1.
+  derived maps failed; drawn won immediately) at scale 0.65.
+- **`anchor_image` must sit at YAML ROOT.** Nested under `render:` it parses into
+  `RenderProfile` and is SILENTLY IGNORED, because the loader reads
+  `raw.get("anchor_image")` at the root and `keyframes.py` reads `config.anchor_image`.
+  Corrected 2026-08-13: the "full-bleed anchor at 0.45 / warmup 1" half of the v3
+  recipe above **never loaded**, so that result was carried by the drawn map alone.
+  Hoisting the key made the container log `seeded from ... at strength 0.45`, and the
+  anchored render then passed first try. Verify the log line rather than the YAML.
 - Gemini flagged plank grain as a border artefact and dough elasticity as
   rubberiness: the eye owns final calls, both directions.

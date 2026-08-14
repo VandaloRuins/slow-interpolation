@@ -1,3 +1,14 @@
+# !! CORRECTION 2026-08-13, DO NOT "FIX" THE KEYS BELOW !!
+# `anchor_image` is nested under `render:` in this file, and the loader reads it
+# at the YAML ROOT (`config.py`: `raw.get("anchor_image")`). So `config.anchor_image`
+# was None and `keyframes.py` started this render from NOISE: the anchor described
+# below NEVER LOADED. Everything v3 achieved was carried by the drawn map alone.
+# The keys are left exactly as they ran because this file is the record of the
+# render that produced `arendt_action_vhm3_raw.mp4`; hoisting them now would
+# falsify that record. New configs put `anchor_image` at root (see
+# `work_chair_vhm.yaml`) and verify the container logs `seeded from ... at strength`.
+# Full context: quality-first progress.md L44 correction + L46.
+#
 # V3. The map is DRAWN, not derived: 44 bold window recesses, 11 x 4, full
 # bleed, after two derived maps produced debris or margins (the control-map
 # skill's founding lesson, reconfirmed). Anchor is the banana facade cropped to
