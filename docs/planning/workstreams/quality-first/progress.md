@@ -1673,3 +1673,125 @@ scaling needs the return pinned to the anchor's scale; not yet fixed.
    banked files. Anything else costs nothing extra but is not a control.
 2. **D1**, which decides D2, which decides whether T10 happens at all.
 3. **T2**, the doc fix. Trivial, twice deferred.
+
+---
+
+## 2026-08-14 session: the ledwall set, and four rules that came out of it
+
+Nine ledwall pieces authored at delivery aspect (never cropped into it), plus the
+PL18 re-audit, the PL17 verdict and the PL16 reversal. Full closure doctrine promoted
+to `docs/findings/loop-closure-taxonomy.md`; instrument and authoring rules promoted
+into the `edit-model-loop` and `motion-compositing` skills. This log keeps the
+narrative and the numbers.
+
+### L46. PL18 was 11 configs, not 1, and it takes L35 with it
+
+The 2026-08-13 audit was done by eye on the files already suspected. Parsing every
+YAML found **11** configs with `anchor_image` nested under `render:`, where the loader
+reads it at root. `anchor_strength` is read at root too, so both keys were inert in
+all of them. Every config in this repo that names an anchor, except the four
+`work_chair_*`, ran without one.
+
+**L35's "anchored base chain" therefore never existed.** Its measurements are real but
+misattributed: every anchored config also carries `warmup: 1` while every unanchored
+sibling carries `warmup: 3`, so the two are perfectly confounded and only warmup was
+ever live. The ramp collapse is `warmup: 1` alone. Corrected in place at L35, L36, L37
+and L46; landed `cd7e32ad0`.
+
+### L47. The anchored base chain works, and it rehabilitates vhm's nocturne
+
+Two renders, $0.06 the pair, both with the anchor at ROOT and the log line verified.
+
+- **In-register control** (daylight interior, anchor seeded from a banana keyframe):
+  the chair's dark-column span sits 3px off the anchor at frame 0 and returns exactly
+  at frame 308. **A banana-authored composition survives an SDXL+LoRA chain intact.**
+- **Out-of-register** (firelit hearth, the register L44 says vhm's corpus lacks): mean
+  luma 43.7 to 68.9 to 43.7 with **0.0% of pixels above 128 in every frame sampled**.
+  It stayed a dark firelit interior.
+
+**L44 is refuted, and PL18 explains why it was ever believed.** L44's evidence came
+from `action_vhm3`, one of the 11 configs whose anchor never loaded. vhm was being
+asked to ORIGINATE a nocturne from noise with a corpus that has none, and could not.
+Handed one through a loaded anchor, it sustains it comfortably. **The corpus gap is
+real; anchoring routes around it.** No v2 dataset and no $1.16 retrain are needed for
+night work provided the anchor loads.
+
+Caveat kept: the render lifts off the anchor's black point (22.8 to 43.7 mean luma),
+and both renders show horizontal banding on the top and bottom edges.
+
+### L48. PL17 closed as a clean negative, and it indicted our own instrument
+
+All three open-weight editors failed; stay on nano banana. $1.53 total. klein and
+Mage-Flow died on the painterly gate at the first edit (klein six times nano's warm
+cast, Mage-Flow painting visible directional brushstrokes into a sky). FireRed survived
+Q1 and died at Q3, detonating into chroma noise at turn 3.
+
+**The finding worth more than the verdict: FireRed's consecutive SSIM went UP as the
+chain died.** Turns 6 to 9 were its four best scores and its mean of 0.8795 BEAT nano
+banana's 0.8297 on a chain that was garbage. Consecutive SSIM measures step size and is
+blind to a monotonic walk away from the original; once the frame is noise, neighbours
+agree because the noise is the attractor. Our SSIM ladder had been the primary health
+check on every chain in the series. Instrument 1b (drift against frame 0) landed in the
+skill as `6d7d6c15e`, and all four of that day's chains were re-checked against it and
+cleared.
+
+Three research corrections: FireRed is **57.7 GB, not ~30 GB**, so it does not fit L40S;
+the Microsoft Mage-Flow repo 404s rather than gates; the `transformers>=4.57` pin is
+unresolvable against diffusers main. And the economics changed: FireRed is ~$0.60 per
+chain against nano banana's $0.67, so **there was never a cost saving**. The 10x saving
+existed only in the two 4B models, both of which failed on their first edit.
+
+`cloud/edit.py` and `tools/edit_keyframes.py` are kept and validated, so re-probing a
+future candidate is a one-class change. `slow-interp-edit-cache` holds ~91 GB awaiting
+Luca's delete-or-keep call.
+
+### L49. Closure is chosen by the phenomenon, and it is chosen before authoring
+
+Promoted in full to `docs/findings/loop-closure-taxonomy.md`. The headline: self-erasing
+subjects (snowfall filling footprints, tide covering ripple marks) close themselves at
+**wrap r 0.986 to 0.989 on the first try with no bridges**; reversible ones (frost, light
+arcs) palindrome to a pixel-exact seam; asymmetric ones (ivy growing then withering) need
+frame-0-anchored bridges and still only reached **0.85 after five extra calls**. Prefer
+the first two when choosing subjects at all.
+
+Also measured: **night to dawn is a threshold that cannot be smoothed.** No inserts gives
+worst-pair r 0.542, one bridge 0.525, and two authored sequential states made it *worse*
+at 0.428, because every intermediate lands on the dawn side. Design around it.
+
+### L50. RIFE cannot carry a wave, and the compositing plate must be authored for the mask
+
+Luca on the first shore attempt: "poor execution unless we can make the interpolation
+directional and gradual following the actual motion of the waves, also your key frames
+had too differing structural images". Both halves correct, and the second explains the
+first: waterline states differing by surface energy 1.00 to 0.29 give RIFE no
+correspondence, so it dissolved rather than advanced. But tighter keyframes would not
+have fixed it either, because RIFE interpolates appearance and has no notion of a wave
+travelling up a beach.
+
+Rebuilt through `animate_fall.py --mode oscillate`. **The new rule, promoted to the
+motion-compositing skill: the mask must contain texture worth moving.** A smooth painted
+wet-sand plate composited to 1.09 grey levels of mean change at the wave crest against
+0.05 outside, and raising amplitude 0.18 to 0.40 with gain 1.2 to 2.2 only reached 3.54.
+Re-authoring the same scene with lacy foam, swash lines and drain channels gave **6.11
+mean, max 27, at lower amplitude and lower gain**. Measured loop seam 1.09 grey levels.
+
+### Luca's direction calls this session
+
+- **The chair subject is dropped entirely** ("not interested anymore"). Five assets
+  removed from the field, the approved 16:5 re-author cancelled. The Work cluster is now
+  empty and needs a different durable object if the triad is to be shown complete.
+- **Thomas Cole is out.** Ledwall pieces use current Arendt subjects and time-play, not
+  the tcole arches and ruins. PL13, PL14 and PL8 retire with it.
+- **Hammershoi is the only LoRA in play.** Epoch 10 confirmed the latest; only one
+  training run exists.
+- Vertical ivy notes, both applied: the change must be perceptible as the subject, and
+  it must be uniform rather than patchy, starting and ending on a bare wall.
+- Snow horizontal: footprints only, trails leaving the centre foreground for the
+  vanishing point, and a soft gradual erasure.
+
+### Board deltas for `/todo` (proposed, not written)
+
+PL13, PL14, PL8 retire. DT14 closes on the session tunnel. Notion labelling resolves to
+an alias map, no renaming. PL16 reopens toward "anchoring solves it" rather than closing
+daylight-only. PL17 closes as a negative. PL18 closes with the 11-config correction.
+DT17 still awaits Luca's look at the FX pairs.

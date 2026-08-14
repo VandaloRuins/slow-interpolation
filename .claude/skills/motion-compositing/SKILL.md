@@ -51,6 +51,27 @@ drags content across the entire run at both ends, and it printed as **three hard
 crescents in the slit-scan, one per wave period**. `np.clip` instead of `% m` smears the
 edge pixel, which is what water piling against the top of its swash looks like.
 
+**The mask must contain TEXTURE WORTH MOVING. Author the plate for the compositor.**
+This is the failure mode that wastes a whole build, because the mechanism reports success
+while the result is invisible. Measured 2026-08-14 on a shore piece: a beautiful painted
+plate whose wet sand was a smooth reflective sheet composited to **1.09 grey levels of
+mean change inside the mask at the wave crest**, against 0.05 outside. Real motion,
+invisible motion. Displacement only shows where there is structure to displace.
+
+**Raising the dials does not rescue it.** Pushing `--amplitude` 0.18 to 0.40 and `--gain`
+1.2 to 2.2 moved it only to 3.54. Re-authoring the SAME scene with lacy foam ribbons,
+overlapping swash lines, rills and dark drain channels gave **6.11 mean, max 27, at lower
+amplitude (0.22) and lower gain (1.4)**. Five and a half times the visible motion from
+texture alone, at a smaller excursion.
+
+So when you author a base plate for this route, ask for structure inside the future mask
+explicitly: "full of visible structure", named features, "broken and detailed, not a
+smooth sheet". A plate composed for the eye alone will composite to nothing.
+
+**Verify with mean |diff| inside the hard mask against frame 0**, comparing it to the same
+number outside the mask. Outside should sit at codec noise (~0.05). If inside is under
+about 2, the eye will not see it no matter what the slit-scan says.
+
 **Size the excursion against the measured run, not by feel.** `--amplitude` is a fraction
 of each column's own masked run, so its pixel value depends entirely on the mask. On
 `led13_b_realloc_soft` the foam mask is 4.3% of frame with a median run of 93 px, so 0.10

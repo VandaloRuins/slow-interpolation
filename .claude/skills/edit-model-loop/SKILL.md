@@ -32,8 +32,42 @@ Decay + entry + work + exit is four acts; every act above one is paid for in spe
 
 `python tools/banana_keyframes.py --out outputs/arendt/<name>/keyframes --base "..." --edit "..." ...`
 
+**Decide the CLOSURE before you write a single prompt.** It follows from the
+phenomenon, not from the wrap, and picking wrong cannot be repaired later:
+self-erasing subjects close themselves (wrap r 0.986 to 0.989, first try, no
+bridges), reversible ones palindrome exactly, and asymmetric ones need anchored
+bridges and still only reach ~0.85. Full taxonomy and decision procedure:
+[docs/findings/loop-closure-taxonomy.md](../../../docs/findings/loop-closure-taxonomy.md).
+
+**Three flags exist for this, all added 2026-08-14:**
+- `--base-image PATH` reuses an existing PNG as keyframe 0 instead of generating
+  one. Use it to re-author only the TAIL of a chain whose early states are good,
+  and to resume after an API failure. Regenerating a validated frame re-rolls it.
+- `--bridge FROM TO` with `--bridge-at` makes the dual-image call from the CLI.
+- a `manifest.json` is written beside the keyframes recording base, edits,
+  preamble, model and sizes. Its absence once made three photographic chains
+  impossible to re-run with one clause changed; the prompts were simply gone.
+
 - 9-10 keyframes, base + 8-9 SEQUENTIAL edits (each edit receives the previous
   output). Small deltas: "a few centimetres", "same hands, same finger count".
+- **Keep any SEQUENTIAL run to about five edits.** At nine, geometry walks: a
+  tall multi-pane window shrank to a small square by state 5 and grey masonry
+  went smooth white by state 8, so the chain could not close. Author the first
+  half sequentially, then reach for anchored bridges.
+- **Never let the subject hide its own reference.** When ivy reached total
+  coverage the wall was gone from the frame, and with no masonry left to
+  preserve the model stopped preserving it. Capping the peak near 90% with the
+  window always visible held the geometry through the whole chain.
+- **Uniformity needs a NEGATIVE, not just a positive.** "Spread uniformly over
+  the entire surface" still produced patches; adding "an even scattering and NOT
+  a patch or a clump in one place" to every edit is what fixed it.
+- **Name coverage as a fraction** ("roughly SIXTY-FIVE PERCENT") when the subject
+  is an extent. Incremental language ("spreading further") produces changes too
+  small to read as the subject.
+- **Style now lives in a prompt clause, so it can be omitted.** With no LoRA the
+  painterly register is only the words; three verticals rendered photographic
+  because the clause was dropped. Trained weights could not be forgotten this
+  way. Check every base prompt carries the full brief.
 - Style brief that survived Luca's review: *soft tonal painting, smooth blended
   gradients, sfumato, no visible brushstrokes, muted palette*. Ban impasto in the
   negative sense of the prompt. He rejected the material/impasto register.
