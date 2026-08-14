@@ -32,6 +32,7 @@ errors on re-run.
 from __future__ import annotations
 
 import base64
+import importlib.util
 import io
 import json
 import os
@@ -47,37 +48,31 @@ RAW = ROOT / "raw"
 OUT = ROOT / "review.json"
 
 
-def _load_env_key() -> str | None:
-    """Walk the known .env locations and return the first Gemini key found.
+def _load_env_key() -> str:
+    """Resolve this project's OWN Gemini key via tools/gemini_review.py.
 
-    Avoids depending on python-dotenv since the system Python has a broken
-    dependency chain. Simple key=value parser is enough for our needs.
+    Copy-safe by design: walks up from this file to find the repo's
+    tools/gemini_review.py, so it keeps working when this script is copied
+    into a new datasets/<name>/ folder, which docs/manual/dataset-curation.md
+    tells you to do. All key policy lives in that one file; this is only a
+    locator.
+
+    It never reads a sibling project's .env. Google bills the GCP project that
+    owns the key, not the code that calls it, so borrowing one charges the
+    lender. This file used to read two sibling projects' .env files first.
     """
-    for env_path in [
-        Path("C:/Users/lucaa/OneDrive/Desktop/RNMW-agent/.env"),
-        Path("C:/Users/lucaa/OneDrive/Desktop/Choire-v2/.env"),
-        ROOT.parents[1] / ".env",
-    ]:
-        if not env_path.exists():
-            continue
-        try:
-            for line in env_path.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                k, v = line.split("=", 1)
-                k = k.strip()
-                v = v.strip().strip('"').strip("'")
-                if k in ("GEMINI_API_KEY", "GOOGLE_API_KEY") and v:
-                    return v
-        except Exception:
-            continue
-    return os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        cand = parent / "tools" / "gemini_review.py"
+        if cand.is_file():
+            spec = importlib.util.spec_from_file_location("gr", cand)
+            gr = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(gr)
+            return gr.api_key()
+    sys.exit(f"could not find tools/gemini_review.py above {here}")
 
 
 API_KEY = _load_env_key()
-if not API_KEY:
-    sys.exit("no GOOGLE_API_KEY / GEMINI_API_KEY in env")
 
 MODEL = "gemini-2.5-flash"
 ENDPOINT = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"

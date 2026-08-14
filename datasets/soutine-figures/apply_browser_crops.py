@@ -8,7 +8,7 @@ LANCZOS if the cropped short side falls below 768 px.
 
 Usage:
     py -3.11 datasets/soutine-figures/apply_browser_crops.py \
-        C:/Users/lucaa/Downloads/gallery-flags.json
+        <path-to-downloads>/gallery-flags.json
 """
 from __future__ import annotations
 

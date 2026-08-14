@@ -65,6 +65,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import importlib.util
 import io
 import json
 import os
@@ -138,30 +139,23 @@ boilerplate.
 """
 
 
-def _load_env_key() -> str | None:
-    """Walk the known .env locations for a Gemini key. Mirrors the pattern
-    in datasets/soutine-figures/gemini_review.py to dodge system-Python
-    pydantic breakage."""
-    for env_path in [
-        Path("C:/Users/lucaa/OneDrive/Desktop/RNMW-agent/.env"),
-        Path("C:/Users/lucaa/OneDrive/Desktop/Choire-v2/.env"),
-        Path(__file__).resolve().parents[2] / ".env",
-    ]:
-        if not env_path.exists():
-            continue
-        try:
-            for line in env_path.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                k, v = line.split("=", 1)
-                k = k.strip()
-                v = v.strip().strip('"').strip("'")
-                if k in ("GEMINI_API_KEY", "GOOGLE_API_KEY") and v:
-                    return v
-        except Exception:
-            continue
-    return os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+def _load_env_key() -> str:
+    """Delegate to the repo's canonical resolver, tools/gemini_review.py.
+
+    This used to hand-walk two sibling projects' .env files before our own,
+    which billed them for our calls. Its docstring justified the
+    local copy as dodging "system-Python pydantic breakage"; that reason is
+    void, because gemini_review imports only stdlib at module level and pulls
+    google.genai inside a function. Do not reintroduce a local copy.
+
+    Raises SystemExit (via api_key) when no key is configured. That is
+    deliberate: a hard stop is what stops a missing key becoming a borrowed one.
+    """
+    tools_dir = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location("gr", tools_dir / "gemini_review.py")
+    gr = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gr)
+    return gr.api_key()
 
 
 def _image_to_b64(path: Path, max_side: int = 1280) -> tuple[str, str]:
@@ -327,10 +321,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = p.parse_args(argv)
 
+    # Exits 1 with a pointer to tools/.env if unset; no silent fallback.
     api_key = _load_env_key()
-    if not api_key:
-        print("error: no GEMINI_API_KEY / GOOGLE_API_KEY in env", file=sys.stderr)
-        return 2
 
     if args.frame is not None:
         if not args.frame.exists():

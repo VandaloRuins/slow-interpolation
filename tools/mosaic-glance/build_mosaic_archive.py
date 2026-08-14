@@ -45,9 +45,21 @@ import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-GLANCE = Path(os.environ.get(
-    "GLANCE_DIR",
-    r"C:\Users\lucaa\OneDrive\Desktop\Ruins-Harness_Tools-for-Agents\glance"))
+
+
+def glance_dir() -> Path:
+    """Locate the glance viewer checkout (it holds make_archive.py).
+
+    This is a public repo, so no machine path and no sibling checkout name is
+    baked in. Set GLANCE_DIR. Resolved at use, not at import, so --help works
+    without it.
+    """
+    d = os.environ.get("GLANCE_DIR")
+    if not d:
+        sys.exit("set GLANCE_DIR to the glance viewer checkout (it holds make_archive.py)")
+    return Path(d)
+
+
 DUP_THRESHOLD = 10  # matches DUP_THRESHOLD in datasets/<name>/build_gallery.py
 
 CLUSTERS = ["watermark", "was-framed", "white-border", "clean"]  # precedence order
@@ -299,7 +311,7 @@ def main():
         files, applied = stage(ds, staging, meta, captions, state, baked)
         print(f"staged {len(files)} images into {len(CLUSTERS)} audit clusters")
 
-        cmd = [sys.executable, str(GLANCE / "make_archive.py"),
+        cmd = [sys.executable, str(glance_dir() / "make_archive.py"),
                "--src", str(staging), "--out", str(out_dir),
                "--collection", args.dataset, "--clean"]
         subprocess.run(cmd, check=True)  # its self-verify is the build gate

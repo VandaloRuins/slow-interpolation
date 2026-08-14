@@ -23,7 +23,7 @@ The Renoir floral dataset under [../../datasets/renoir-flowers/](../../datasets/
 - The collection target is 5 to 200 source images, depending on use (5 to 10 for a reference set, 80 to 200 for a LoRA training set).
 - The user can run the gallery in a browser, click `×` and `✂`, and trust you with everything else. They cannot edit Python scripts.
 - You have shell access, file-system write access under `datasets/<name>/`, and outbound network access for sourcing.
-- You have a `GOOGLE_API_KEY` environment variable for Gemini calls. If you do not, ask the user to set one before Phase 2.
+- You have a `GEMINI_API_KEY` in this project's own `tools/.env` for Gemini calls. If you do not, ask the user to set one before Phase 2. Never point a script at another project's `.env`: Google bills the project that owns the key, not the code that calls it.
 
 If any of these assumptions does not hold, stop and clarify with the user.
 
@@ -51,7 +51,7 @@ Before any work, set up the dataset folder.
    cp datasets/renoir-flowers/{source_commons,gemini_review,gemini_review_pass2,apply_crops,apply_crops_pass2,apply_browser_crops,dedup,finalize_metadata,update_metadata_post_process,captions,build_gallery,serve,package_for_civitai}.py datasets/<name>/
    ```
 4. **Edit `source_<origin>.py` for the new domain.** See Phase 1 below.
-5. **Confirm `GOOGLE_API_KEY` is available.** Read it from `~/.env` or wherever the project keeps secrets. If missing, ask the student to set one before continuing.
+5. **Confirm `GEMINI_API_KEY` is available** in this project's `tools/.env`. The copied scripts resolve it through `tools/gemini_review.py`, which reads only this repo's own env and fails loudly if the key is absent. Never repoint them at a sibling project's `.env`. If missing, ask the student to set one before continuing.
 
 ## Phase 1: Source
 

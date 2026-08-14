@@ -6,7 +6,7 @@ Retrospective on the three-and-a-half-day push that took `slow-interpolation` fr
 
 ### Phase 1: consolidate + document the legacy (Kickoff Steps 1 to 5)
 
-The repo started with two parallel legacy pipelines in `legacy/`: Choire v2 (vertical fresco videos) and After Cole (horizontal Hudson River School landscapes). Both ran as standalone Python scripts that reached into a sibling Choire v1 folder (`c:/Users/lucaa/OneDrive/Desktop/Choire/visuals/`) for LoRA weights, RIFE checkpoints, and a working ESRGAN venv. The same technique, two implementations, no single source of truth.
+The repo started with two parallel legacy pipelines in `legacy/`: Choire v2 (vertical fresco videos) and After Cole (horizontal Hudson River School landscapes). Both ran as standalone Python scripts that reached into a sibling Choire v1 folder (`$DESK/Choire/visuals/`) for LoRA weights, RIFE checkpoints, and a working ESRGAN venv. The same technique, two implementations, no single source of truth.
 
 Step 1 (consolidation) produced:
 

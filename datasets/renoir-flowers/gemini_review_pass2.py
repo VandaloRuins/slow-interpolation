@@ -10,6 +10,7 @@ inner edge of the frame.
 """
 from __future__ import annotations
 
+import importlib.util
 import io
 import json
 import os
@@ -17,7 +18,6 @@ import sys
 import time
 from pathlib import Path
 
-from dotenv import load_dotenv  # type: ignore
 from PIL import Image
 from google import genai
 from google.genai import types
@@ -28,8 +28,32 @@ PREV = ROOT / "review.json"
 OUT = ROOT / "review_pass2.json"
 LOG = ROOT / "processed.json"
 
-load_dotenv(Path("C:/Users/lucaa/OneDrive/Desktop/Choire-v2/.env"))
-API_KEY = os.environ.get("GOOGLE_API_KEY")
+
+def _load_env_key() -> str:
+    """Resolve this project's OWN Gemini key via tools/gemini_review.py.
+
+    Copy-safe: walks up from this file to find tools/gemini_review.py, so it
+    still works when copied into a new datasets/<name>/ folder, which
+    docs/manual/dataset-curation.md tells you to do. Key policy lives in that
+    one file; this is only a locator.
+
+    Never reads a sibling project's .env. Google bills the GCP project that
+    owns the key, not the code that calls it, so borrowing one charges the
+    lender. This file used to do exactly that, billing an unrelated project
+    for our dataset triage.
+    """
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        cand = parent / "tools" / "gemini_review.py"
+        if cand.is_file():
+            spec = importlib.util.spec_from_file_location("gr", cand)
+            gr = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(gr)
+            return gr.api_key()
+    sys.exit(f"could not find tools/gemini_review.py above {here}")
+
+
+API_KEY = _load_env_key()
 MODEL = "gemini-2.5-flash"
 
 PROMPT = """Second-pass audit. The image has already been processed once;

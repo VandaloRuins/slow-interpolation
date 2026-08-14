@@ -23,7 +23,7 @@ If your contribution does not match one of these, open an issue first and we'll 
 3. **Commit small.** One coherent change per commit. Commit messages: imperative present (`add Cezanne LoRA finding`, not `added` or `adding`).
 4. **Tests pass.** `python -m pytest tests/ -q` is the bar. New code adds new tests; the existing 55 tests must stay green.
 5. **No em dashes** in any text you write into the repo. Use commas, periods, or "to" for ranges. This is a stylistic constraint of the original author; it keeps the prose consistent across forks.
-6. **No sibling-folder dependencies** in `src/`. `grep -rE "Choire|After Cole" src/ vendor/` must return nothing in your PR.
+6. **No sibling-folder dependencies.** `python -m pytest tests/test_no_sibling_paths.py` must pass. It covers `src/`, `vendor/`, `tools/`, `datasets/`, `docs/`, `.github/` and `.claude/`, and bans absolute machine paths, live parallel-project names, and `Choire`/`After Cole` inside code directories. Documenting the lineage in `docs/` is fine.
 7. **Update the docs map.** If you added a file under `docs/`, add it to `docs/README.md` in the same PR.
 8. **Open the PR** against `main`. Reference any related issue. Describe what you tried, what you observed, and what changed.
 

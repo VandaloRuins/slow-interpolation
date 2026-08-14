@@ -134,7 +134,7 @@ These are the constraints the original author works under. Future agents are exp
 - **Strong opinions.** When trade-offs exist, name the trade-off and recommend a default. Do not enumerate options without taking a position.
 - **No premature abstractions.** Three similar lines is better than a wrong abstraction. The roadmap is phased on purpose.
 - **No defensive validation for impossible inputs.** Trust internal code. Validate only at boundaries (user input, external APIs, file I/O).
-- **No sibling-folder dependencies in `src/`.** `grep -rE "Choire|After Cole" src/ vendor/` must return nothing. LoRA paths are config-resolved.
+- **No sibling-folder dependencies.** Enforced by `tests/test_no_sibling_paths.py` over `src/`, `vendor/`, `tools/`, `datasets/`, `docs/`, `.github/` and `.claude/`: no absolute machine paths, no live parallel-project names, and no `Choire`/`After Cole` inside code directories (documenting the lineage in `docs/` stays fine). LoRA paths are config-resolved. This replaces the hand-run `grep -rE "Choire|After Cole" src/ vendor/`, which never looked at `tools/` or `datasets/`, where six scripts were reading a sibling project's `.env` and billing that project for our API calls.
 - **Pause on destructive operations.** Hard git resets, force pushes, mass file moves, dependency removals: confirm first.
 
 These are documented at length in [CLAUDE.md](CLAUDE.md), which is the per-session framing for any Claude Code agent landing in the project directory.

@@ -166,17 +166,26 @@ The local-service rationale carries over from v1: API keys cannot live in the br
 
 ```python
 import os, io, requests
+import sys
 from pathlib import Path
 from PIL import Image
-from dotenv import load_dotenv
 
-load_dotenv(Path("C:/Users/lucaa/OneDrive/Desktop/Choire-v2/.env"))
+# Credentials come from THIS project's tools/.env, never a sibling project's.
+# media_store.load_env() is the one loader; see tools/gemini_review.py for the
+# same pattern applied to the Gemini key, and tests/test_no_sibling_paths.py
+# for the rule that keeps it that way.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+import media_store  # noqa: E402
+
+ENV = media_store.load_env()
 
 class StabilityEraseBackend:
     URL = "https://api.stability.ai/v2beta/stable-image/edit/erase"
 
     def __init__(self, api_key: str | None = None):
-        self.api_key = api_key or os.environ["STABILITY_API_KEY"]
+        self.api_key = api_key or ENV.get("STABILITY_API_KEY")
+        if not self.api_key:
+            sys.exit("set STABILITY_API_KEY in tools/.env")
 
     def erase(self, image: Image.Image, mask: Image.Image, prompt: str = "") -> Image.Image:
         # prompt is ignored: Stability Erase has no prompt input

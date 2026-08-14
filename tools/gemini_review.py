@@ -13,7 +13,8 @@ verdict.
     python tools/gemini_review.py --all              # every mp4 under outputs/
     python tools/gemini_review.py --all --subject "Times Square"
 
-The key is read from RNMW-agent/.env at runtime and is never printed or stored.
+The key is read from this project's own tools/.env at runtime and is never
+printed or stored.
 """
 
 from __future__ import annotations
@@ -26,25 +27,37 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+TOOLS_DIR = ROOT / "tools"
 FEEDBACK = ROOT / "gallery-feedback.json"
-ENV_FILES = [
-    Path("c:/Users/lucaa/OneDrive/Desktop/RNMW-agent/.env"),
-    ROOT / ".env",
-]
 MODEL = "gemini-2.5-flash"
 
 
 def api_key() -> str:
-    if os.environ.get("GEMINI_API_KEY"):
-        return os.environ["GEMINI_API_KEY"]
-    for env in ENV_FILES:
-        if not env.exists():
-            continue
-        for line in env.read_text(encoding="utf-8", errors="replace").splitlines():
-            line = line.strip()
-            if line.startswith("GEMINI_API_KEY"):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    print("GEMINI_API_KEY not found", file=sys.stderr)
+    """Resolve THIS project's own Gemini key. Canonical resolver for the repo.
+
+    Reads tools/.env then the repo root via media_store.load_env(); a real
+    environment variable wins over both.
+
+    There is deliberately NO fallback to any sibling project's .env. Google
+    bills a Gemini call to the GCP project that owns the key, not to the code
+    that made the call, so borrowing a key silently charges the lender. This
+    file used to read a sibling project's .env first and put EUR 21 of
+    keyframe generation on that project's bill in August 2026. A missing key is a hard
+    failure here precisely so it can never quietly become someone else's.
+    """
+    if str(TOOLS_DIR) not in sys.path:
+        sys.path.insert(0, str(TOOLS_DIR))
+    import media_store
+
+    key = (media_store.load_env().get("GEMINI_API_KEY") or "").strip()
+    if key:
+        return key
+    print(
+        f"GEMINI_API_KEY not found. Put this project's OWN key in {TOOLS_DIR / '.env'}\n"
+        "(create one at https://aistudio.google.com/apikey).\n"
+        "Do NOT point this at another project's .env: it bills them, not us.",
+        file=sys.stderr,
+    )
     raise SystemExit(1)
 
 

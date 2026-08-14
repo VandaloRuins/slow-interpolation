@@ -2,7 +2,7 @@
 
 Everything the legacy scripts touch outside this repo, where it actually lives on disk, and what the port should do about it.
 
-Verified against the local file system on 2026-05-14. Paths are absolute Windows paths under `c:/Users/lucaa/OneDrive/Desktop/`. For brevity below, **`$DESK`** abbreviates that root.
+Verified against the local file system on 2026-05-14. Paths are absolute Windows paths under the developer's Desktop root. For brevity below, **`$DESK`** abbreviates that root.
 
 ## Policy
 

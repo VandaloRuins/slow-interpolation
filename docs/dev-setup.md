@@ -14,7 +14,7 @@ Bootstrap notes for running the pipeline on a fresh machine.
 **Important: install torch + torchvision from PyTorch's CUDA wheel index BEFORE `pip install -e .`**. PyPI's default torchvision wheel pulls in a CPU-only torch as a transitive dependency and silently downgrades any existing CUDA build. The CUDA wheels live on a separate index.
 
 ```powershell
-cd c:\Users\lucaa\OneDrive\Desktop\slow-interpolation
+cd path\to\slow-interpolation
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install --upgrade pip
