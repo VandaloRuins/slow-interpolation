@@ -45,6 +45,30 @@ Decay + entry + work + exit is four acts; every act above one is paid for in spe
 
 1. **SSIM ladder** (consecutive pairs at half scale): healthy chains sit 0.85-0.98;
    the wrap is the number that matters. Under ~0.75, bridge it.
+   **This instrument alone is not sufficient, and 2026-08-14 showed how it fails.**
+   In the PL17 bake-off, FireRed's chain detonated into chroma noise at turn 3, and
+   its consecutive SSIM went *up* as it died: turns 6 to 9 scored 0.955 / 0.963 /
+   0.970 / 0.975, its four best, and its mean of 0.8795 BEAT nano banana's 0.8297
+   on a chain that was garbage. Consecutive SSIM measures step size, so it is
+   structurally blind to a monotonic walk away from the original: once the frame
+   is noise, neighbours agree because the noise is the attractor. Always pair it
+   with instrument 1b.
+1b. **Drift against FRAME 0, never against the neighbour.** Two numbers per state:
+   SSIM to frame 0, and surface energy (laplacian variance) as a RATIO to frame 0.
+   The kill signal is surface energy climbing fast and monotonically, with chroma
+   going with it (FireRed: 0.64 at turn 2, 7.55 at turn 3, ~11x by turn 6). A wrap
+   SSIM of 0.15 against frame 0 says the loop cannot close no matter what the
+   consecutive ladder claims.
+   **Read the ratio against the subject before calling it a fault.** A legitimate
+   chain moves this number too, and the direction is meaningful: `ledC_ruin` climbs
+   to 2.71x because bare masonry genuinely becomes dense foliage, and
+   `action_path_vert_wood` FALLS to 0.46x because ferns are genuinely replaced by
+   smooth bare earth. Both are the subject. What is never the subject is a fast
+   monotonic climb past ~3x with the consecutive ladder improving underneath it.
+   **Cheap forecast, one call:** per-edit surface ratio on a single edit predicts
+   chain survival. FireRed's 1.38 compounds to ~5.5 over six edits (measured 11.2);
+   nano banana's 1.21 compounds to nothing and ends at 0.88, because it re-blends
+   rather than accumulating edge energy.
 2. **Semantic velocity, by eye on the strip**: SSIM cannot see "no hand becomes
    full hand" (0.94 on exactly that). Ask WHAT changed per pair, not how much.
 3. **Entity consistency**: finger counts, object counts, sleeves appearing. The
