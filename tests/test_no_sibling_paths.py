@@ -32,6 +32,21 @@ CODE_DIRS = ("src", "vendor", "tools", "datasets", ".github")
 # Everything tracked that ships, including prose.
 ALL_DIRS = CODE_DIRS + ("tests", "docs", ".claude")
 
+# CODE, as opposed to prose. The sibling-project rules apply only to these.
+#
+# Learned by running the first version of this test against trunk: it flagged 19
+# perfectly good lines. `Ruins-Harness_Tools-for-Agents/glance/` is a RELEASED
+# DEPENDENCY that docs/manual/dataset-glance.md must name to tell you how to
+# install it, and docs/planning/workstream-registry.md names `Ruins-agent` to
+# define a scope boundary. Both are the documentation doing its job.
+#
+# The defect was never "this repo mentions another project". It was code
+# REACHING INTO one at runtime. So: code must not reference a sibling repo;
+# prose may describe one. Machine paths stay banned everywhere, in prose too,
+# because a hardcoded C:\Users\... is useless to a reader and leaks a username
+# either way.
+SOURCE_EXTS = (".py", ".ts", ".tsx", ".js", ".mjs", ".sh", ".yml", ".yaml")
+
 # Exact paths only. NEVER a glob: an exemption with a wildcard becomes the hole
 # the rule was written to close. Every entry carries the reason it exists.
 ALLOWED: dict[str, str] = {
@@ -58,32 +73,41 @@ EXEMPT_PREFIXES = ("legacy/",)
 #
 #   RNMW-agent / Ruins-* are ACTIVE parallel projects, not lineage. Naming one
 #   anywhere published discloses it, so those are banned in prose too.
-PATTERNS: list[tuple[str, re.Pattern[str], str, tuple[str, ...]]] = [
+# (label, pattern, why, dirs, exts). exts=None means every tracked file in dirs.
+PATTERNS: list[tuple[str, re.Pattern[str], str, tuple[str, ...], tuple[str, ...] | None]] = [
     (
         "machine path",
         re.compile(r"[A-Za-z]:[\\/]Users[\\/]|/(?:home|Users)/[A-Za-z0-9._-]+/"),
-        "absolute paths leak the author's username and break on every other machine",
+        "absolute paths leak the author's username and break on every other machine, "
+        "in prose as much as in code",
         ALL_DIRS,
+        None,
     ),
     (
-        "active sibling project",
+        "sibling project in CODE",
         re.compile(r"RNMW-agent|Ruins-Harness_Tools-for-Agents|Ruins-agent"),
-        "naming a live parallel project in a public repo discloses it and couples the two",
+        "code must not reach into a parallel project at runtime. Prose may name one: "
+        "the glance tool is a released dependency the manual has to tell you how to "
+        "install, and the workstream registry names the studio repo to define a "
+        "scope boundary",
         ALL_DIRS,
+        SOURCE_EXTS,
     ),
     (
-        "legacy lineage in code",
+        "legacy lineage in CODE",
         re.compile(r"Choire|After Cole"),
         "src/ and vendor/ must not depend on the projects this was ported from, and "
         "neither must tools/ or datasets/, which is where the key leak actually was. "
         "Documenting the lineage in docs/ is fine and deliberately not covered",
         CODE_DIRS,
+        SOURCE_EXTS,
     ),
     (
         "foreign secret name",
         re.compile(r"GOOGLE_AI_API_KEY|GEMINI_API_KEY_[A-Z]"),
         "these are another repo's variable names; this project uses a bare GEMINI_API_KEY",
         ALL_DIRS,
+        None,
     ),
 ]
 
@@ -99,21 +123,27 @@ def tracked_files() -> list[str]:
     return [p for p in out.split("\0") if p]
 
 
-def in_scope(rel: str, dirs: tuple[str, ...]) -> bool:
+def in_scope(rel: str, dirs: tuple[str, ...], exts: tuple[str, ...] | None) -> bool:
     if rel in ALLOWED or rel.startswith(EXEMPT_PREFIXES):
         return False
-    return rel.startswith(tuple(d + "/" for d in dirs))
+    if not rel.startswith(tuple(d + "/" for d in dirs)):
+        return False
+    return exts is None or rel.endswith(exts)
 
 
 @pytest.mark.parametrize(
-    "label,pattern,why,dirs", PATTERNS, ids=[p[0] for p in PATTERNS]
+    "label,pattern,why,dirs,exts", PATTERNS, ids=[p[0] for p in PATTERNS]
 )
 def test_no_forbidden_strings(
-    label: str, pattern: re.Pattern[str], why: str, dirs: tuple[str, ...]
+    label: str,
+    pattern: re.Pattern[str],
+    why: str,
+    dirs: tuple[str, ...],
+    exts: tuple[str, ...] | None,
 ) -> None:
     hits: list[str] = []
     for rel in tracked_files():
-        if not in_scope(rel, dirs):
+        if not in_scope(rel, dirs, exts):
             continue
         path = REPO / rel
         try:
