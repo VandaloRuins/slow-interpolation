@@ -1,0 +1,123 @@
+# WORK: the chair through the vhm chain. Arendt series, Work cluster (PL15).
+#
+# The painter of interiors renders the interior piece: this is vhm's literal
+# home register (room, furniture, raking window light, L44), so lora_scale
+# stays at the family default 0.80 (the 0.70 drop was v3's amber-vs-grey
+# concession, not needed in daylight). The chain params are the ones L44
+# validated: DRAWN map at 0.65, full-bleed anchor at 0.45 / warmup 1, base
+# 40 steps, trim at delivery.
+#
+# Work's time (doctrine): the made thing endures while time wears it. The
+# drift half of the loop is the technique's own entropy; the anchored return
+# is the maintenance. Light-only discipline: the subject clause is
+# byte-identical across A/B/A, only the light phrase moves.
+#
+# Map: outputs/arendt/anchors/work_chair_map.png, drawn (PIL) from the
+# hand-free anchor's geometry: chair as bold ladder-back strokes, floor ramp,
+# window recess, wall planes as true depth greys. Anchor: the eye-approved
+# work_chair2 banana keyframe 0 with arm/hand/cloth removed by edit
+# (work_chair_kf0_nohand.png), so anchor and "no people" negative agree.
+
+seed: 1087
+
+# TOP LEVEL, not under render:. The loader reads raw.get("anchor_image") at
+# the root; nested under render: it parses into RenderProfile and is silently
+# ignored (keyframes.py reads config.anchor_image). v1/v2 of this config, and
+# action_vhm3 before it, nested it and ran ANCHORLESS: v1/v2 collapsed to the
+# map's flat field, and v3's "full-bleed anchor" was a no-op carried by its
+# full-bleed map. Flagged for the workstream log.
+anchor_image: outputs/arendt/anchors/work_chair_kf0_nohand.png
+anchor_strength: 0.45
+
+style:
+  name: hammershoi_interiors_epoch_10
+  lora_path: models/loras/Hammershoi_Interiors_epoch_10.safetensors
+  lora_scale: 0.80
+  prefix: "vhm, "
+  suffix: ", smooth blended tonal gradients, sfumato, oil painting"
+  negative_prompt: "photograph, 3D render, digital art, saturated color, impasto, thick paint, heavy brushstrokes, signature, watermark, frame, border, canvas edge, people, figures"
+
+subject:
+  name: arendt_work_chair_slow
+  prompts:
+    - label: "A: dim grey light"
+      prompt: >-
+        dim even grey morning light, a plain wooden ladder-back chair standing
+        alone on a bare wooden floor beside a tall window on the left,
+        no people
+    - label: "B: warm raking light"
+      prompt: >-
+        warm raking afternoon light falling through the window across the
+        chair and the floor, long soft shadows, a plain wooden ladder-back
+        chair standing alone on a bare wooden floor beside a tall window on
+        the left, no people
+    - label: "A (return)"
+      prompt: >-
+        dim even grey morning light, a plain wooden ladder-back chair standing
+        alone on a bare wooden floor beside a tall window on the left,
+        no people
+
+resolution:
+  width: 1408
+  height: 768
+
+# K = (2+1) + (4+2) + 1 = 10. raw = 10 * 31 - 1 = 309.
+frames:
+  steady: 2
+  steady_per_segment: [2, 4]
+  transition: 1
+  return_: 2
+  warmup: 1
+
+render:
+  structural_decay_radius: 1
+  anchor_image: outputs/arendt/anchors/work_chair_kf0_nohand.png
+  anchor_strength: 0.45
+  steady_strengths: [0.30, 0.30, 0.30, 0.30, 0.30, 0.30, 0.30, 0.30]
+  transition_strength: 0.38
+  return_strength_start: 0.35
+  return_strength_end: 0.30
+  return_pixel_blend_max: 0.45
+
+control:
+  model: diffusers/controlnet-depth-sdxl-1.0
+  image: outputs/arendt/anchors/work_chair_map.png
+  scale: 0.65
+  guidance_start: 0.0
+  guidance_end: 0.6
+
+sampling:
+  num_inference_steps: 60
+  guidance_scale: 6.0
+
+rife:
+  passes: 5
+  skip_boundary: 0
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: null
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+
+output_dir: outputs/arendt
