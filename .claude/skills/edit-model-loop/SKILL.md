@@ -154,9 +154,20 @@ invisible on a slow loop.
 - **No human hands, ever** (Luca, 2026-08-13). Objects and places, at most
   crowds; never hands active in a task ("it does not convert well, while the
   chair slowly aging by itself looked very promising"). The acting element is
-  the thing itself: the chair, the light, the cloth, the chairs-as-crowd.
-  Hand chains also carry a measured aging drift (smooth hands turn veined over
-  8+ sequential edits and never return).
+  the thing itself: the light, the ivy, the frost, the snow, the crowd of
+  lit windows. Hand chains also carry a measured aging drift (smooth hands
+  turn veined over 8+ sequential edits and never return).
+- **No chair, and no Thomas Cole** (Luca, 2026-08-14). The chair was the
+  original illustration of the rule above and is now itself excluded: "I would
+  stop all outputs with the subject chair, not interested anymore". Five chair
+  assets came off the field and an approved re-author was cancelled.
+  **Consequence to carry:** the chair was the ONLY `work_*` piece, so the Work
+  cluster is empty and the Vita Activa triad cannot currently be shown
+  complete. Work needs a different durable object, or an explicit decision to
+  run on two notions. Cole is out too: ledwall and series pieces use the
+  current Arendt subjects, "not the tcole arches and ruins". **Hammershoi
+  (`Hammershoi_Interiors_epoch_10`) is the only LoRA in play**, and most series
+  pieces use none at all.
 - **Sequential edits are blind to frame 0**, so a "return to the start" edit
   drifts (chairs never reset, textures accumulate as swirl). Author the return
   leg with MULTI-image edits: hand the model the previous keyframe AND frame 0

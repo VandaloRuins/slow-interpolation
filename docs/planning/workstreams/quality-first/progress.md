@@ -1424,7 +1424,11 @@ LED-wall and vhm experiments removed): the series IS the work now.
 
 **Validated this arc, for the record:** the edit-model keyframe loop end to end
 (4 of 7 pieces gate-passed, two at 9/10/9/8); drawn ControlNet maps over derived
-ones (third confirmation); anchored base chains with full-bleed anchors; the
+ones (third confirmation); ~~anchored base chains with full-bleed anchors~~ **[STRUCK
+2026-08-14, kb-sync: this item was never validated. The anchor did not load in any
+of those renders (11 configs, see L46), so what the arc actually validated was
+`warmup: 1`. A genuinely anchored chain was first run on 2026-08-14 and DOES work,
+see L47, but that is a later result and not this one.]**; the
 keeper-floor gate with mandatory eye signoff; curation_sync apply-always (the
 check-then-export pattern was bypassed twice by shell pipelines eating exit
 codes; always `--apply` before export, it is idempotent).
