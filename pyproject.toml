@@ -28,7 +28,15 @@ dependencies = [
 [project.optional-dependencies]
 train = ["datasets", "bitsandbytes"]
 live = ["mediapipe", "opencv-python"]
-dev = ["pytest", "ruff", "ipykernel"]
+# cv2 is a REAL test dependency, not an optional one: tools/artefact_sim.py
+# imports it at module level, tests/test_quality.py imports it directly, and
+# quality.border_features needs it for the Sobel in b_orient. Without it the
+# eight test_quality.py tests error out and the whole build stays red.
+# HEADLESS specifically: the GUI build needs libGL.so.1, which the ubuntu-latest
+# runner does not ship, so plain opencv-python trades ModuleNotFoundError for
+# ImportError. Nothing in this repo calls the cv2 GUI functions.
+# Do NOT install .[dev,live] together; both cv2 wheels claim the same namespace.
+dev = ["pytest", "ruff", "ipykernel", "opencv-python-headless"]
 # Optional cloud-render path. See docs/modal.md.
 # Install with: pip install -e .[cloud]
 # Modal SDK is intentionally NOT in core dependencies: users who never
