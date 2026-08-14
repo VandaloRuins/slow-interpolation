@@ -1,5 +1,23 @@
 # Kickoff prompt: replace nano banana with an open-weight editor, 100% on Modal
 
+> **DONE, 2026-08-14. Do not re-run this brief.** All three candidates were tested on
+> Modal and all three failed. klein and Mage-Flow died on the Q1 painterly gate at the
+> first edit; FireRed passed Q1 marginally, then disintegrated over a nine-edit chain
+> (surface energy x11 against frame 0, wrap SSIM 0.15) and composited rather than
+> interpolated on Q4. **We stay on `gemini-3.1-flash-image`.** Verdicts, evidence and
+> three corrections to the research are in
+> [image-edit-model-alternatives.md section 10](../findings/image-edit-model-alternatives.md#10-bake-off-results-2026-08-14).
+> The implementation is kept and works: [`cloud/edit.py`](../../cloud/edit.py) hosts all
+> three candidates and [`tools/edit_keyframes.py`](../../tools/edit_keyframes.py) is a
+> validated drop-in for `banana_keyframes.py`, so re-probing a NEW candidate is now a
+> one-class change rather than a fresh build.
+>
+> **Read section 10.6 before designing any successor experiment.** The project's own
+> health metric, consecutive SSIM, rose as the failing chain died and scored FireRed
+> *above* nano banana. Measure drift against frame 0, not against the neighbour.
+
+**Original brief follows, preserved for posterity.**
+
 **MUST DO. Blocked production once already** (Gemini credits depleted mid-session,
 2026-08-13, stopping both keyframe generation and the review gate).
 
