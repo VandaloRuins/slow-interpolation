@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from slow_interpolation.quality import border_features, hf_ratio
+from slow_interpolation.quality import border_features, hf_ratio, keyframe_features
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -86,3 +86,49 @@ def test_border_features_do_not_crash_on_a_narrow_frame():
     out = border_features(f)
     assert set(out) >= {"b_hf", "b_detail", "b_orient", "b_edgepeak"}
     assert all(np.isfinite(v) for v in out.values())
+
+
+def write_keyframes(d, offsets, h=256, w=640):
+    """Keyframes as a window sliding over one wide frame: clean translation.
+
+    Rolling a single frame would wrap a seam into view and give the flow
+    estimator an edge to lock onto, which is not the motion under test.
+    """
+    import cv2
+    d.mkdir(parents=True, exist_ok=True)
+    wide = painterly(h=h, w=w + max(offsets) + 1)
+    for i, dx in enumerate(offsets):
+        cv2.imwrite(str(d / f"{i:04d}.png"), wide[:, dx:dx + w])
+    return d
+
+
+def test_keyframe_features_separates_a_steady_pair_from_a_drifting_one(tmp_path):
+    """Guards the CAUSE-side measure, and the scikit-image import it needs.
+
+    keyframe_features answers how hard a job RIFE was handed, so its two
+    numbers have to move in opposite directions on the same fixture:
+    keyframes that agree score high on ssim and near zero on flow.
+
+    It is also the only place scikit-image is imported. Nothing declared that
+    dependency until 2026-08-14, so this test is what stops it going missing
+    the way cv2 did.
+    """
+    steady = keyframe_features(write_keyframes(tmp_path / "steady", [0, 0, 0]))
+    drift = keyframe_features(write_keyframes(tmp_path / "drift", [0, 8, 16]))
+    for out in (steady, drift):
+        assert out["kf_count"] == 3
+        assert all(np.isfinite(v) for v in out.values())
+    assert steady["kf_ssim"] > 0.99, "identical keyframes must agree"
+    assert drift["kf_ssim"] < steady["kf_ssim"]
+    assert drift["kf_flow"] > steady["kf_flow"]
+
+
+def test_keyframe_features_is_empty_below_two_frames(tmp_path):
+    """A missing staging dir returns {}, it does not raise.
+
+    Callers treat {} as "no keyframes preserved for this render", which is the
+    normal case before led16. An exception here would break analyse_render on
+    every older clip.
+    """
+    assert keyframe_features(tmp_path / "never_created") == {}
+    assert keyframe_features(write_keyframes(tmp_path / "one", [0])) == {}

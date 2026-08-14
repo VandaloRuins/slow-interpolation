@@ -1,8 +1,11 @@
-torch
-numpy
-pillow
-opencv-python
-diffusers
-transformers
-accelerate
-peft
+# Dependencies live in pyproject.toml. This file is a pointer, not a second list.
+#
+# It used to be a hand-maintained parallel list, and it drifted: it named
+# opencv-python while the dev extra named no opencv at all, which is how CI
+# stayed red from 2026-08-13 while this file looked correct. One source of
+# truth is the fix.
+#
+#   pip install -r requirements.txt     (still works, resolves via pyproject)
+#   pip install -e .[dev]               (identical, and what CI runs)
+#
+-e .[dev]

@@ -36,7 +36,17 @@ live = ["mediapipe", "opencv-python"]
 # runner does not ship, so plain opencv-python trades ModuleNotFoundError for
 # ImportError. Nothing in this repo calls the cv2 GUI functions.
 # Do NOT install .[dev,live] together; both cv2 wheels claim the same namespace.
-dev = ["pytest", "ruff", "ipykernel", "opencv-python-headless"]
+# The upper bound is not cosmetic: test_b_detail asserts a 0.85 ratio computed
+# from cv2.Sobel output, so an opencv major can redden the build with no commit
+# from us. 4.13 and 5.0 both pass; 6.x needs a deliberate bump and a re-run.
+# scikit-image backs quality.keyframe_features (SSIM between keyframes).
+dev = [
+    "pytest",
+    "ruff",
+    "ipykernel",
+    "opencv-python-headless>=4.10,<6",
+    "scikit-image",
+]
 # Optional cloud-render path. See docs/modal.md.
 # Install with: pip install -e .[cloud]
 # Modal SDK is intentionally NOT in core dependencies: users who never
