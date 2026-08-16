@@ -1,0 +1,136 @@
+# TEST 1, IN-REGISTER CONTROL. Arendt series, Work cluster.
+#
+# Question: does a banana-authored composition survive into an SDXL+vhm chain
+# when NOTHING disagrees? Daylight interior is vhm's proven home register
+# (room, furniture, raking window light, L44), so if the composition dies here
+# the fault is the anchored base chain, not the LoRA's range.
+#
+# Paired with labor_embers_vhm_v2.yaml (TEST 2, out-of-register). The pair is
+# designed to differ in ONE thing: the register of the anchored scene. Both are
+# anchor-only at 0.45 / warmup 1, same seed, same frame counts, same sampler.
+#
+# ---------------------------------------------------------------------------
+# WHY THERE IS NO `control:` BLOCK HERE (deviation from work_chair_vhm.yaml)
+# ---------------------------------------------------------------------------
+# work_chair_vhm.yaml pairs its anchor with outputs/arendt/anchors/
+# work_chair_map.png, a depth map DRAWN from work_chair_kf0_nohand.png's
+# geometry. Measured 2026-08-14 by edge energy over the chair band (y 140..600):
+#
+#   work_chair_kf0_nohand.png (map's source) : chair x[479..890] cx=684 w=411
+#   work_chair_map.png        (the map)      : chair x[491..877] cx=684 w=386
+#   work_chair_day/keyframes/0000.png (THIS) : chair x[511..582] cx=546 w= 71
+#
+# The map agrees with the OLD anchor to within 6% and cx to the pixel. It does
+# NOT agree with this one: the day keyframe's chair sits ~138 px left and is far
+# smaller. Keeping the map would set ControlNet (scale 0.65, guidance to 0.6)
+# pulling the chair toward x=684 while the anchor holds it at x=546, which is
+# the anchor-vs-map disagreement that already killed one run today. Worse, it
+# would make the result unreadable: if the composition failed to survive we
+# could not tell whether the chain lost it or the map overwrote it.
+#
+# So the map is dropped and the ANCHOR alone carries the composition. This also
+# makes TEST 1 and TEST 2 mechanically identical, which is what lets the pair
+# isolate register.
+
+seed: 1087
+output_name: arendt_work_chair_anchored_daykf
+
+# TOP LEVEL, not under render:. config.py:521-523 reads anchor_image and
+# anchor_strength from the YAML ROOT; nested under render: they parse into
+# RenderProfile and are silently ignored (keyframes.py reads config.anchor_image).
+# 11 configs were found in that inert state on 2026-08-14.
+anchor_image: outputs/arendt/anchors/work_chair_day_kf0.png
+anchor_strength: 0.45
+
+style:
+  name: hammershoi_interiors_epoch_10
+  lora_path: models/loras/Hammershoi_Interiors_epoch_10.safetensors
+  lora_scale: 0.80
+  prefix: "vhm, "
+  suffix: ", smooth blended tonal gradients, sfumato, oil painting"
+  negative_prompt: "photograph, 3D render, digital art, saturated color, impasto, thick paint, heavy brushstrokes, signature, watermark, frame, border, canvas edge, people, figures"
+
+# Verified against the anchor 2026-08-14: the anchor shows a plain wooden
+# ladder-back chair standing alone on a bare floor, tall window on the LEFT,
+# even grey daylight, no people. Subject clause is byte-identical across
+# A/B/A; only the light phrase moves (light-only discipline).
+subject:
+  name: arendt_work_chair_anchored_daykf
+  prompts:
+    - label: "A: dim grey light"
+      prompt: >-
+        dim even grey morning light, a plain wooden ladder-back chair standing
+        alone on a bare wooden floor beside a tall window on the left,
+        no people
+    - label: "B: warm raking light"
+      prompt: >-
+        warm raking afternoon light falling through the window across the
+        chair and the floor, long soft shadows, a plain wooden ladder-back
+        chair standing alone on a bare wooden floor beside a tall window on
+        the left, no people
+    - label: "A (return)"
+      prompt: >-
+        dim even grey morning light, a plain wooden ladder-back chair standing
+        alone on a bare wooden floor beside a tall window on the left,
+        no people
+
+resolution:
+  width: 1408
+  height: 768
+
+# K = (2+1) + (4+2) + 1 = 10. warmup 1 is MANDATORY with an anchor (L17):
+# warmup pass 2+ runs at a hardcoded 0.75 and repaints away the composition
+# the anchor exists to preserve (keyframes.py:416).
+frames:
+  steady: 2
+  steady_per_segment: [2, 4]
+  transition: 1
+  return_: 2
+  warmup: 1
+
+render:
+  structural_decay_radius: 1
+  steady_strengths: [0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35]
+  transition_strength: 0.38
+  return_strength_start: 0.35
+  return_strength_end: 0.30
+  return_pixel_blend_max: 0.45
+
+sampling:
+  num_inference_steps: 40
+  guidance_scale: 6.0
+
+rife:
+  passes: 5
+  skip_boundary: 0
+  edge_crop: 0
+  sinusoidal: false
+  vendor_path: vendor/rife_v425
+
+encoding:
+  fps: 30
+  quality: 9
+  codec: libx264
+  pixelformat: yuv420p
+
+borders:
+  crops_coords_top_left: [256, 256]
+  original_size: [1024, 1024]
+  latent_edge_px: 3
+  latent_edge_strength: 0.3
+
+models:
+  sdxl_base: stabilityai/stable-diffusion-xl-base-1.0
+  lightning_lora: null
+  vae: madebyollin/taesdxl
+  vae_full: madebyollin/sdxl-vae-fp16-fix
+  vae_kind: full
+
+modal:
+  gpu: L40S
+  preserve_staging: true
+  notes:
+    - "TEST 1 of the anchored pair: in-register daylight control."
+    - "ControlNet dropped: work_chair_map.png (cx=684) disagrees with this anchor (cx=546)."
+
+output_dir: outputs/arendt
