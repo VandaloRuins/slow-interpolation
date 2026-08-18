@@ -41,6 +41,14 @@ and reused, so a rebuild after a new batch costs seconds, not the 194 s of a col
 
 ## Traps, each of which actually happened
 
+**The export scans SUBFOLDERS, so working files publish as if they were pieces**
+(2026-08-15). `action_shore`'s source clip and its rejected perspective variant were
+sitting in `outputs/arendt/action_shore/` and both appeared in the served catalogue as
+finished work, at full size. Any compositing piece leaves a source clip behind and any
+A/B leaves a loser, so this recurs. **Keep working files under `outputs/_work/<piece>/`,
+never in a subfolder of the collection directory.** Caught only by reading the served
+catalogue BY NAME; an asset count would have looked fine, because the count was correct.
+
 **The stable URL and the deployment URL are different things.** `vercel deploy` prints
 `glance-deploy-<hash>-....vercel.app`, which **302s to a Vercel login** — anyone you
 send it to sees a sign-in page. The shareable one is the production alias,
