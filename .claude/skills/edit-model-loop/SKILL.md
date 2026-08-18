@@ -12,6 +12,42 @@ project (`labor_hands`, `action_snow`, both 9/10/9/8 with zero surviving flags)
 within a day of being invented. Trust the sequence below; every step earned its
 place through a measured failure.
 
+## THE BANANA INTERPOLATION BASELINE (v1, frozen 2026-08-18)
+
+**This is the pipeline of record and it WORKS. Do not change it while alternatives are
+being explored** (PL20, [`kickoff-keyframe-authoring.md`](../../../docs/planning/kickoff-keyframe-authoring.md)).
+Luca, 2026-08-18: *"we can keep nano banana pipeline we have now, but ultimately i would
+like to work to find cheaper solutions for the same quality and more creative control."*
+
+Recall it by name: **banana interpolation**. Any replacement is measured **against** this
+baseline, never merged into it. If a probe changes a step below, it is a different pipeline
+and gets a different name.
+
+| element | frozen value |
+|---|---|
+| keyframe author | `gemini-3.1-flash-image` (nano banana), **$0.067/image** |
+| authoring | `tools/banana_keyframes.py` — `--base` / `--base-image` / `--bridge` + `--bridge-at`, `BASE_SUFFIX` on by default, `manifest.json` per chain |
+| register | carried by a PROMPT CLAUSE, not by weights (this is the known weak point) |
+| critique | `tools/chain_stats.py` (structure r + drift vs frame 0) + chroma delta + the eye at native res |
+| interpolation | `tools/loop_render.py`, RIFE v4.25, `skip_boundary 0`, `edge_crop 0`, wrap included |
+| closure | from the phenomenon, per `findings/loop-closure-taxonomy.md` |
+| sizes | **1408x768** horizontal, **1024x1280** vertical, both %64 |
+| encode | exactly 300 frames, 30 fps, h264 crf 16, yuv420p |
+| gate | `tools/review_gate.py` keeper floor (7/9/5/8) + MANDATORY eye signoff |
+| cost | **~$0.40 to $0.67 per chain, ~$4 per nine-piece day** |
+
+**Reference ladders, what healthy looks like** (computed free from frames on disk, PL17
+§10.10). Use these to judge any candidate replacement:
+
+| chain | mean consecutive SSIM | wrap | note |
+|---|---|---|---|
+| `labor_embers` 1408x768 | **0.903** | 0.917 | the gated 10/10/9/9 piece |
+| `ledB_snow` 1856x576 | 0.830 | 0.651 | two pairs already below the bridging threshold |
+| `ledA_window` 592x1792 | 0.429 | 0.258 | dusk-to-night; SSIM is **not** usable here |
+
+Best pieces produced by this baseline: `action_mist` **10/10/10/9**, `labor_embers`,
+`labor_vert_wipe`, `labor_hands`, `action_snow`.
+
 ## 1. Stage the piece on its clock BEFORE any pixels
 
 The 10-second loop means a different thing per Arendt cluster, and the seam is
