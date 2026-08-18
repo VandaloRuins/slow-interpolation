@@ -1799,3 +1799,146 @@ PL13, PL14, PL8 retire. DT14 closes on the session tunnel. Notion labelling reso
 an alias map, no renaming. PL16 reopens toward "anchoring solves it" rather than closing
 daylight-only. PL17 closes as a negative. PL18 closes with the 11-config correction.
 DT17 still awaits Luca's look at the FX pairs.
+
+---
+
+## 2026-08-14/15 session: the series batch, and two model limits worth more than the pieces
+
+Nine pieces at the SERIES sizes (1408x768 horizontal, 1024x1280 vertical), eight keepers
+and one published failure. The ledwall thread is closed and its sizes are retired; do not
+author at 1728x540 or 912x2736 again. Reconciled to the board 2026-08-18.
+
+**The pieces.** `work_kiln` 1408x768 (10/10/10/9, then 7/9/6/9 on a re-gate of the same
+clip), `action_mist` 1408x768 (**10/10/10/9**, the reviewer's worst-point field came back
+"no discernible defects or weak points"), `action_shore` 1408x768 (9/10/9/9, the
+compositing route), `labor_bedroom` 1024x1280 (9/9/6/9), `labor_vert_shadow` 1024x1280
+(8/9/6/9), `work_bricks` 1408x768 (9/10/7/9), `work_bell` 1024x1280 (9/10/6/9),
+`labor_vert_steps_v2` 1024x1280 (10/10/7/9), and `labor_vert_steps` (6/9/7/9, FAILED,
+published with its verdict).
+
+**PL19 closes.** Three durable non-furniture objects now carry Work: the kiln, the bell
+and the brick stacks. The triad can be shown complete.
+
+### L51. The edit model signs its work, and the negative is not reliable
+
+`work_kiln` came back with a fabricated cursive artist signature in the bottom-right of
+**all ten states**, and `labor_vert_steps` came back painted as a CANVAS, woven edge and
+tacking margin included, on all four sides of every state. Both originate in frame 0 and
+are then inherited by every sequential edit and every bridge, so **the base is the only
+lever that matters**.
+
+`BASE_SUFFIX` in `banana_keyframes.py` now carries the negatives by default (`837e498bb`),
+with `--no-base-suffix` to opt out and the manifest recording which was used. It works
+**5 times in 6**: `work_bricks` still produced a monogram despite the suffix saying "NO
+monogram" in those words. So the negative reduces the rate and does not eliminate it, and
+a **corner check belongs in the routine critique**, not in the hope that the prompt held.
+Removal is cheap and local: a feathered median over the stroke box across every state,
+then re-render, which costs no API calls at all.
+
+### L52. RIFE mottles across a colour-temperature change, and BOTH our instruments are blind to it
+
+The most valuable result of the session. `labor_bedroom`'s first render was covered in blue
+and orange blotches across the floorboards, the duvet and the wall. The gate scored it
+8/9/6/9 and described it only as "floorboard grain morphing", which badly undersells it.
+
+**The decisive test: a frame sitting ON a keyframe is clean, while the MIDPOINT of the same
+pair mottles.** So RIFE produces it, not the model. It is flow error made visible by colour
+difference: on a flat wall the flow is ambiguous, patches blend from different source
+regions, and that is invisible when both endpoints share a hue and glaring when they do not.
+
+**Structure r and SSIM are both computed on grayscale and cannot see hue.** The offending
+pair scored a healthy 0.985. Measuring mean Lab (a,b) distance per pair instead:
+
+| chroma delta | result |
+|---|---|
+| 1.2 | clean |
+| 11.0 | clean |
+| **22.9** | **mottled** |
+
+Promoted to `docs/findings/loop-closure-taxonomy.md` §5 as a third instrument. **Keep chroma
+delta under about 11 per pair on any chain that changes light.**
+
+### L53. Gold to twilight is a SECOND threshold that cannot be smoothed
+
+When the chroma delta cannot be brought under 11 by authoring, it is because the model has
+no in-between to give. **Seven** intermediates were spent on `labor_bedroom`'s single
+gold-to-twilight gap — dual-image bridges AND sequential edits, at `one third of the way`,
+`halfway` and `two thirds of the way` — and every one landed on the cool side. The gap
+stayed at **19**. `--bridge-at` has no purchase on a colour gap, because the bridge is a
+compositing operation and there is nothing to composite when the states differ mainly in hue.
+
+This is the same shape as night-to-dawn (L49) and joins it in the taxonomy. Both are
+crossings of a colour temperature. **Brightness alone interpolates fine**: the kiln's
+dark-to-firelit chain crosses a far larger luminance range and holds.
+
+**The remedy is in the renderer, not the prompt.** Let RIFE carry luminance and structure,
+and cross-fade the colour analytically between the two endpoint keyframes. Applied to
+`labor_bedroom` over 360 interpolated frames with the 24 keyframe positions untouched: the
+mottling vanished, the structure was unchanged, and the gate moved to 9/9/6/9 with every
+chroma flag dropped. **The script is NOT landed** — it lives in the session scratchpad
+pending Luca's call on a `--chroma-blend` flag for `loop_render.py`, proposed as opt-in
+because on a pair where content genuinely MOVES an unwarped chroma fade would ghost.
+
+### L54. A covering medium that REPLACES its substrate hides the geometric reference
+
+`labor_vert_steps` walked its staircase in BOTH versions, gaining treads and re-proportioning
+the flight, **despite an explicit "CRITICAL: the SAME number of steps, the same width, the
+same rise" clause in every edit**. Snow lying on stone treads erases the treads, and once the
+reference is gone the model re-invents it. A verbal preservation clause does not hold geometry
+the subject has hidden.
+
+The contrast in the same session is exact: `action_mist` veiled an entire valley and its
+foreground drystone wall stayed pixel-stable at 10/10/10/9, and `labor_vert_shadow` darkened
+a wall whose plaster read straight through the shade. **Prefer a veil or a light over a
+replacement**, promoted to the taxonomy §1 beside the closure preference. Luca's call:
+retire the snow-on-steps subject, keep v2 on the field.
+
+Two prompt-level corollaries. "An even scattering" is read as **literal dots**, and produced
+speckles on vertical wall faces; say "a smooth continuous settled layer". And cap a coverage
+peak well below the point where the reference disappears.
+
+### L55. The model GROWS a shadow, it does not translate one
+
+`labor_vert_shadow` v1 asked a cypress shadow to travel across a wall and got a shadow that
+spread and diffused instead, worst pair r 0.752 falling to **0.520** after a bridge that
+cloned its own endpoint. Unfixable by density.
+
+v2 asked for the same shadow **climbing and lengthening up the wall** as the sun drops, which
+is both physically correct and what the model already wanted to do. Clean chain, and it
+rendered and gated at 8/9/6/9. **Author the arc the model can draw**: growth, lengthening and
+coverage all work; rigid translation of a soft shape does not. The same principle carried
+`work_bell`, whose louvre bars lengthen across the bronze rather than sweeping over it.
+
+### L56. The Glance export scans SUBFOLDERS, so working files publish as pieces
+
+`action_shore`'s source clip and its rejected perspective variant appeared in the served
+catalogue as if they were finished pieces. Caught by reading the served catalogue by name,
+not the build log. Any compositing piece leaves a source clip behind, so this recurs: keep
+working files under `outputs/_work/<piece>/`, never in a subfolder of `outputs/arendt/`.
+
+### L57. The gate is noisy enough that the eye must decide
+
+`work_kiln` scored 10/10/10/9 and then 7/9/6/9 on a clip differing only by a 106px corner
+patch, with a loop spread of 6 across three votes. `work_bricks` went 7/8/6/7 to 9/10/7/9
+after a signature removal that touched 58x40 pixels. Every defect that actually mattered
+this session was found at **native resolution by eye** and either missed or under-weighted by
+the score. The keeper floor stays a floor, not a verdict.
+
+### Direction calls this session
+
+- **Series sizes only**: 1408x768 and 1024x1280. The ledwall set is submitted and that thread
+  is closed.
+- **Snow-on-steps retired** as a subject; `labor_vert_steps_v2` stays on the field.
+- **Stay pure banana** for the batch; no LoRA in the authoring path.
+- **Work is carried by the kiln, the bell and the brick stacks.**
+- A new research workstream is open to remove the nano banana dependency:
+  `docs/planning/workstreams/keyframe-authoring/design.md` (`b17ad0cda`), built specifically
+  not to repeat PL17. It asks whether a LoRA-conditioned GENERATOR, structurally anchored,
+  can author the chain, which L47 makes plausible. Phase 1 is a kill gate on whether it can
+  author a controlled delta at all.
+
+### Board deltas for `/todo` (applied 2026-08-18)
+
+PL19 DONE. PL15, PL0, ST1 and ST3 context appended. PL20 opened for the keyframe-authoring
+research. DT20 opened for the unlanded chroma fix and its undocumented limit. DT21 opened for
+the routine signature audit.

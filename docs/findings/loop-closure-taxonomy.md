@@ -31,6 +31,18 @@ the loop closes for free. `--no-palindrome`.
 **Prefer these subjects.** Both of the session's cleanest loops were of this kind, both
 closed first try with no bridges and no re-authoring.
 
+**And prefer a medium that VEILS over one that REPLACES.** This is a separate axis from
+closure and it decides whether the geometry survives at all. A veil (mist, shade, a light
+patch, wetness) leaves the thing it covers visible and readable underneath. A replacement
+(snow lying on stone treads, foliage swallowing a wall) removes the very reference the
+model needs to hold, and once it is gone the model re-invents it. Measured 2026-08-14:
+`labor_vert_steps` walked its staircase, gaining treads and re-proportioning the flight,
+in BOTH versions, **despite an explicit "CRITICAL: the SAME number of steps" clause in
+every edit** — a verbal preservation clause does not hold geometry the subject has hidden.
+The same day, `action_mist` veiled an entire valley and its foreground wall stayed pixel-
+stable, and `labor_vert_shadow` darkened a wall whose plaster read straight through the
+shade. Both scored 10/10/10/9 and 8/9/6/9 with no geometry work at all.
+
 ### Reversible, the exact case. Author half.
 
 Frost forming and melting, a light arc, a shadow crossing a wall. Author the forward
@@ -84,6 +96,12 @@ returned a near-copy of one side (r 0.996 and 0.999 to that endpoint) while the 
 stayed at 0.525. A second bridge clones the endpoint again. Above roughly r 0.5, bridging
 stops buying anything and the problem is the arc, not the density.
 
+**It collapses on a COLOUR gap too, and there `--bridge-at` is inert.** On a gold-to-twilight
+step (§4) five bridges at three different `--bridge-at` settings all returned near-copies of
+the cool endpoint. Structure r was never the problem there: it read 0.985. Since the bridge
+is a compositing operation rather than an interpolation, it has nothing to composite when
+the two states differ mainly in hue.
+
 This matches what the PL17 bake-off measured independently: the bridge is a
 **compositing** operation, not an interpolation. Even nano banana's own bridge sits
 further from both endpoints than the endpoints sit from each other.
@@ -103,6 +121,21 @@ first step larger rather than smaller:
 
 Adding keyframes made it worse. Design around it: dusk to night is safe, and a light
 cycle that goes day to night and back through dusk never crosses the threshold.
+
+**Gold to twilight is the second one** (measured 2026-08-15 on `labor_bedroom`). The
+golden-hour state and the blue-twilight state are separated by a chroma delta of 22.9
+(see §5), and the model has no in-between to give. **Seven** authored intermediates were
+spent on that single gap, both dual-image bridges and sequential edits, at `one third of
+the way`, `halfway` and `two thirds of the way` — every one of them landed on the cool
+side, and the gap stayed at **19**. `--bridge-at` has no purchase here at all.
+
+The tell is the same as night-to-dawn: an intermediate that comes back as a near-copy of
+one endpoint. When you see it twice, stop authoring and change something else — the
+subject, the light range, or the render (§5).
+
+So the list of un-smoothable light transitions is now **two**, and both are crossings of a
+colour temperature rather than of a brightness. Brightness alone interpolates fine: the
+kiln's dark-to-firelit chain crosses a far larger luminance range and holds.
 
 ---
 
@@ -128,6 +161,33 @@ Likewise low SSIM with high structure r is usually a light or texture change, no
 `ledA_window` measured SSIM 0.39 to 0.47, which reads as a broken chain, while structure
 r ran 0.995 / 0.972 / 0.839 / 0.892 / 0.990. A dusk-to-night event moves every pixel's
 luminance and SSIM cannot tell that from collapse.
+
+### The blind spot: both instruments above are GRAYSCALE
+
+Structure r is a contrast-normalised low pass and SSIM is computed on luminance. **Neither
+can see hue.** So a pair can score a perfectly healthy 0.985 while carrying a colour
+rotation large enough to break the render, and nothing in §5 above will warn you.
+
+Measured 2026-08-15 on `labor_bedroom`, using mean Lab (a,b) distance per pair:
+
+| chroma delta | result in the rendered loop |
+|---|---|
+| 1.2 | clean |
+| 11.0 | clean |
+| **22.9** | **mottled** |
+
+The failure is not in the keyframes, which is what makes it easy to miss. **On a keyframe
+the frame is clean; at the MIDPOINT of the same pair the flat surfaces break into blue and
+orange blotches.** It is RIFE flow error made visible by colour difference: on a wall or a
+floor the flow is ambiguous, so patches blend from different source regions, which is
+invisible when both endpoints share a hue and glaring when they do not.
+
+**So measure chroma delta alongside structure r on any chain that changes light**, and keep
+it under about 11 per pair. If the phenomenon will not allow that (see §4, gold to
+twilight), the fix is not more keyframes — it is to let RIFE carry luminance and structure
+and cross-fade the colour analytically between the two endpoints. That is a light-event
+remedy only: where content genuinely MOVES between endpoints, an unwarped chroma fade
+ghosts.
 
 ---
 

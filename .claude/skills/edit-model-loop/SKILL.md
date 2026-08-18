@@ -75,7 +75,11 @@ bridges and still only reach ~0.85. Full taxonomy and decision procedure:
   one keyframe step reads as an apparition at 1 s; entry/exit need 3 keyframes
   each if they must happen at all).
 
-## 3. Critique BEFORE interpolating, three instruments
+## 3. Critique BEFORE interpolating, four instruments
+
+> Instruments 1 and 1b are now a tool: `python tools/chain_stats.py --dir <accum>`
+> (add `--wrap` for a self-closing chain). It prints the consecutive ladder, the
+> drift against frame 0 and the surface ratio, and flags any pair under 0.85.
 
 1. **SSIM ladder** (consecutive pairs at half scale): healthy chains sit 0.85-0.98;
    the wrap is the number that matters. Under ~0.75, bridge it.
@@ -107,6 +111,21 @@ bridges and still only reach ~0.85. Full taxonomy and decision procedure:
    full hand" (0.94 on exactly that). Ask WHAT changed per pair, not how much.
 3. **Entity consistency**: finger counts, object counts, sleeves appearing. The
    edit model takes small liberties; catch them here, not in the gate.
+4. **Chroma delta per pair, which instruments 1 and 1b CANNOT SEE.** Structure r is
+   a contrast-normalised low pass and SSIM is computed on luminance, so both are
+   **blind to hue**. Measured 2026-08-15 on `labor_bedroom`: a pair scoring a
+   perfectly healthy 0.985 carried a colour rotation that broke the render into blue
+   and orange blotches. Measure mean Lab (a,b) distance between consecutive states:
+   **1.2 clean, 11.0 clean, 22.9 mottled.** Keep it under about 11 on any chain that
+   changes light. If the phenomenon will not allow that, the fix is in the encode,
+   not the prompt (see §4).
+
+**Signature and canvas check, every chain, at both bottom corners.** The model
+volunteers a painted signature or a canvas edge into frame 0 and every later state
+inherits it. `BASE_SUFFIX` in `banana_keyframes.py` suppresses it about 5 times in 6,
+so this is a check and not a formality: `work_bricks` produced a monogram with the
+suffix active. Removal is a feathered median over the stroke box across every state
+plus a re-render, which costs no API calls.
 
 **Wrap bridge**: the edit model accepts MULTI-IMAGE input. Hand it the last
 keyframe AND frame 0, ask for "the exact in-between moment". Halves the seam step.
@@ -128,6 +147,18 @@ PASSED **9/10/9/9** re-encoded from the same frames with plain frame-drop. If a 
 is long enough to worry about, densify the KEYFRAMES rather than the encode. Where an
 exact-300 needs a nudge, `tpad=stop_mode=clone:stop=N` clones a tail frame, which is
 invisible on a slow loop.
+
+**When a pair crosses a colour temperature, do not let RIFE interpolate the colour.**
+Flow is ambiguous on flat surfaces, so patches blend from different source regions; that
+is invisible when both endpoints share a hue and, above a chroma delta of about 11 (§3),
+it prints as blue and orange mottling. The tell is exact: **a frame sitting ON a keyframe
+is clean while the MIDPOINT of the same pair mottles.** Densifying does not fix it,
+because gold-to-twilight is an un-smoothable threshold (see Known boundaries). The fix is
+to keep RIFE's luminance and cross-fade the a,b channels linearly between the two endpoint
+keyframes, leaving keyframe positions untouched. On `labor_bedroom` that cleared every
+chroma flag and moved the gate to 9/9/6/9. **Light-event pairs only**: where content
+genuinely MOVES between endpoints, an unwarped chroma fade ghosts. Render with
+`--keep-frames`, correct, then re-encode.
 
 ## 5. Gate, then eyes, then publish
 
@@ -161,10 +192,10 @@ invisible on a slow loop.
   original illustration of the rule above and is now itself excluded: "I would
   stop all outputs with the subject chair, not interested anymore". Five chair
   assets came off the field and an approved re-author was cancelled.
-  **Consequence to carry:** the chair was the ONLY `work_*` piece, so the Work
-  cluster is empty and the Vita Activa triad cannot currently be shown
-  complete. Work needs a different durable object, or an explicit decision to
-  run on two notions. Cole is out too: ledwall and series pieces use the
+  **Consequence, now RESOLVED 2026-08-15:** the chair was the ONLY `work_*` piece,
+  which left Work empty. Three durable non-furniture objects now carry it and the
+  triad can be shown complete: `work_kiln` (a brick bottle kiln, the thing that
+  MAKES durable things), `work_bell` and `work_bricks`. Cole is out too: ledwall and series pieces use the
   current Arendt subjects, "not the tcole arches and ruins". **Hammershoi
   (`Hammershoi_Interiors_epoch_10`) is the only LoRA in play**, and most series
   pieces use none at all.
@@ -178,6 +209,15 @@ invisible on a slow loop.
   transition (dusk to night, night to dawn, peak to first-return) gets 2-3
   authored keyframes of its own, not one step plus a reactive tween. Every
   single-keyframe transition this far has needed a tween after the fact.
+- **TWO light transitions cannot be smoothed at all, and densifying makes them
+  worse.** Night-to-dawn (measured 2026-08-14: 0.542 with no inserts, 0.525 with a
+  bridge, **0.428** with two authored states) and **gold-to-twilight** (measured
+  2026-08-15: seven intermediates, bridges AND sequential edits, at one third /
+  halfway / two thirds, every one landing on the cool side, gap stuck at 19).
+  Both are crossings of a colour temperature; brightness alone interpolates fine,
+  and the kiln's dark-to-firelit chain crosses a far larger luminance range and
+  holds. **Design around them:** day to night and back THROUGH DUSK never crosses
+  either. If you must cross one, fix it in the encode (§4), not the prompt.
 - **The standing objective is fluidity** (Luca, 2026-08-13): the loop should
   read as ONE continuous movement, never as interpolation between staged
   frames. More keyframes with smaller deltas beats fewer with big deltas;
@@ -192,6 +232,27 @@ invisible on a slow loop.
 - **RIFE cannot invent particulate motion.** Dust, spray, snowfall-as-particles
   morph as blobs (`labor_sweep`, motion 4). Author such media as per-keyframe
   STATES (settled / lifted / settled), or avoid.
+- **Prefer a medium that VEILS over one that REPLACES** (measured 2026-08-15). A
+  veil — mist, shade, a light patch, wetness — leaves the thing it covers readable
+  underneath. A replacement — snow lying on stone treads, foliage swallowing a wall
+  — removes the reference the model needs to hold, and once it is gone the model
+  re-invents it. `labor_vert_steps` walked its staircase in BOTH versions, gaining
+  treads and re-proportioning the flight, **despite an explicit "CRITICAL: the SAME
+  number of steps" clause in every edit**: a verbal preservation clause does not hold
+  geometry the subject has hidden. Same session, `action_mist` veiled an entire
+  valley with its foreground wall pixel-stable at 10/10/10/9. Cap any coverage peak
+  well below the point where the reference disappears.
+- **The model GROWS a shadow, it does not translate one.** Asking a cypress shadow to
+  travel across a wall produced spreading and diffusion, worst pair 0.752 falling to
+  **0.520** after a bridge that cloned its own endpoint. Re-authored as the same
+  shadow CLIMBING and LENGTHENING up the wall, which is what a lowering sun does
+  anyway, it rendered clean. Author the arc the model can draw: growth, lengthening
+  and coverage all work; rigid translation of a soft shape does not. `work_bell`'s
+  louvre bars lengthen across the bronze for the same reason.
+- **"An even scattering" is read as literal DOTS.** It produced speckles on vertical
+  wall faces. The uniformity NEGATIVE ("NOT a patch or a clump in one place") is still
+  required, but pair it with "a smooth continuous settled layer" rather than
+  "scattering", and add "no speckles, dots or spots" where a surface must stay clean.
 - **A LoRA cannot render a register its dataset lacks** (vhm has no nocturnes; the
   dusk facade stayed daylight). Check the corpus before promising a register.
 - **A caption prior is a composition force**: vhm's "bare walls" erased a window
