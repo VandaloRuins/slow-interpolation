@@ -125,10 +125,17 @@ tools/mosaic-glance/site*/
 
 # --- private working surface (2026-08-19) -------------------------------
 # This repo is the PUBLIC workshop package. The rules above already keep the
-# bulk out, but 445 files were still untracked-and-unignored, which is one
+# bulk out, but 218 files were still untracked-and-unignored, which is one
 # `git add -A` from being published. Everything below is either a run
 # artifact, a deployment identifier, or a screenshot: none of it is source,
 # and none of it is workshop material.
+#
+# 218 measured against the upstream tree. The commit that added this block
+# said 445, which was wrong: `git status` was reporting against a LOCAL HEAD
+# that was behind origin/main, so ~227 files already committed upstream
+# looked untracked. Corrected here; see the follow-up commit. The rules
+# themselves were unaffected, because every hazard they name was verified
+# individually as genuinely absent from the upstream tree.
 #
 # Deliberately NOT covered here, because they need a decision rather than a
 # rule: examples/configs/** (generic technique configs are workshop material,
