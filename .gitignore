@@ -122,3 +122,40 @@ outputs/
 
 # Glance dataset-mosaic sites: viewer payload + thumbnails derived from raw/ (image bytes stay out; rebuild with tools/mosaic-glance/build_mosaic_archive.py)
 tools/mosaic-glance/site*/
+
+# --- private working surface (2026-08-19) -------------------------------
+# This repo is the PUBLIC workshop package. The rules above already keep the
+# bulk out, but 445 files were still untracked-and-unignored, which is one
+# `git add -A` from being published. Everything below is either a run
+# artifact, a deployment identifier, or a screenshot: none of it is source,
+# and none of it is workshop material.
+#
+# Deliberately NOT covered here, because they need a decision rather than a
+# rule: examples/configs/** (generic technique configs are workshop material,
+# but nyc-billboard/, course-of-empire/ and arendt/ look like commissions),
+# and tools/agent-ops-harness/ (the note above says the bundle IS meant to be
+# tracked, so its being untracked is an oversight, not a policy).
+
+# Media-archive ingest run logs. One file per run, machine-generated, 160 of
+# them. Regenerate by running an ingest; never commit.
+knowledge/operations/media-ingest/
+
+# Vercel project pins for private deployments. Not credentials, but they name
+# and target deployments that are not part of the workshop package.
+# Two patterns, not one: the main field's pin is `.glance-vercel.json` with
+# nothing between the prefix and the suffix, so a single glob misses it.
+.glance-vercel.json
+.glance-*-vercel.json
+
+# A live tunnel address, and the render gallery's exported review state.
+tunnel-url.txt
+review-gate.json
+
+# Loose screenshots at the repo root. The Glance/gallery workflow is
+# screenshot-driven, so these accumulate, and a screenshot of a signed-in
+# session renders a credential as readable text. One in this pile is a cloud
+# billing page. The equivalent rule was added upstream only AFTER a live key
+# was found sitting in four browser dumps; added here before that happens.
+/*.png
+/*.jpg
+/*.jpeg
