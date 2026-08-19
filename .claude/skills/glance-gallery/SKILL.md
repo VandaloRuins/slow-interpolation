@@ -26,7 +26,7 @@ Read it before changing anything the field renders. Do not restate its facts her
 
 ```bash
 python tools/sync_outputs.py --prefix <name>                              # if from Modal
-python tools/glance_export.py --no-frames --dest outputs/_glance-renders  # rebuild the archive
+python tools/glance_export.py --no-frames --video-only --dest outputs/_glance-renders
 python tools/glance_deploy.py --deploy --prod                             # publish
 ```
 
@@ -37,11 +37,28 @@ and reused, so a rebuild after a new batch costs seconds, not the 194 s of a col
 
 ## Which view
 
-- `--no-frames` (**the default you want**): finished renders only. 418 assets, 43
-  clusters, ~15 MB before video. This is the gallery.
-- full (no flag): 2,951 assets including 2,533 keyframes. Honest, and it buries the
+**This gallery shows FINISHED VIDEO WORK. Founder rule, 2026-08-19.**
+
+- `--no-frames --video-only` (**the flags you want, both of them**): 435 assets, 31
+  clusters, every tile a video.
+- full (no flag): everything including keyframe sequences. Honest, and it buries the
   renders. Worth building when the question is a run's *drift* rather than a
   deliverable, because a sequence reads as a colour arc across its own cluster.
+
+**`--no-frames` alone does NOT give you a video gallery, and believing it did is how
+half the live field became working files.** That flag drops a path only if `keyframes`
+or `frames` is one of its components. Everything else published as finished work: on
+2026-08-19 the live field was 418 assets of which **209 were stills, and 201 of those
+were LoRA validation grids, compositing backgrounds, `qa_edge_band_overlay.png`,
+contact sheets and flow masks.** A local export had gone further and swept in numbered
+frames out of a folder called `rejected_v1_return`.
+
+`--video-only` is an allowlist, deliberately not another word on that denylist. A new
+working folder is now excluded by default rather than published by default. Extending
+the denylist would have fixed those names and none of the next ones.
+
+**Read the served catalogue by name, not by count.** Both failures above produced a
+plausible asset count and a field that rendered correctly. Nothing looked wrong.
 
 ## Traps, each of which actually happened
 

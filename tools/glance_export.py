@@ -10,8 +10,13 @@ by run, reflowing under a query. Glance itself is a separate tool and knows noth
 about this repo; it reads the contract and nothing else.
 
     python tools/glance_export.py                    # everything, incl. keyframes
-    python tools/glance_export.py --no-frames --dest outputs/_glance-renders
+    python tools/glance_export.py --no-frames --video-only --dest outputs/_glance-renders
     python tools/glance_export.py --limit 400        # quick sample while iterating
+
+The shared field shows FINISHED VIDEO WORK, so it wants BOTH flags. `--no-frames`
+alone is not enough: it drops a path only when `keyframes` or `frames` is one of its
+components, so every other working-file folder (validation grids, compositing layers,
+QA overlays, contact sheets) publishes as a finished piece.
 
 Then:
 
@@ -139,6 +144,28 @@ def screen_of(rel: Path, dims: tuple[int, int] | None) -> str:
     return "unassigned"
 
 
+# Arendt's three notions, in HER order -- The Human Condition's sequence, and the
+# founder's (2026-08-13). Order is explicit because encounter order is alphabetical
+# (action first), which would misstate the argument the clustering exists to make.
+NOTION_ORDER = {"labor": 1, "work": 2, "action": 3, "unsorted": 4}
+
+
+def notion_of(rel: Path) -> str:
+    """labor / work / action from the filename's own tokens, or 'unsorted'.
+
+    The token can sit anywhere in the stem -- action_chairs, but also
+    arendt_work_chair_fast -- so search the tokens rather than trusting position.
+    A file naming no notion says 'unsorted' rather than guessing: same honesty
+    rule as screen_of's 'unassigned'.
+    """
+    for tok in re.split(r"[_\-]+", rel.stem.lower()):
+        if tok == "labour":
+            tok = "labor"
+        if tok in ("labor", "work", "action"):
+            return tok
+    return "unsorted"
+
+
 # conform.py stamps "__<screen>_<w>x<h>" onto a delivery file, so the manifest for
 # led13_c_realloc_soft__bc_1728x540.mp4 is led13_c_realloc_soft.manifest.json.
 CONFORM_SUFFIX_RE = re.compile(r"__[a-z]+_\d+x\d+$", re.I)
@@ -241,7 +268,8 @@ def collect(include_frames: bool, limit: int | None,
             since_days: float | None = None,
             exclude_keys: set[str] | None = None,
             match: list[str] | None = None,
-            specs: set[tuple[int, int]] | None = None):
+            specs: set[tuple[int, int]] | None = None,
+            video_only: bool = False):
     import time as _time
     cutoff = (_time.time() - since_days * 86400) if since_days else None
     items = []
@@ -261,6 +289,23 @@ def collect(include_frames: bool, limit: int | None,
             continue
         is_frame = "keyframes" in rel.parts or "frames" in rel.parts
         if is_frame and not include_frames:
+            continue
+        # ALLOWLIST, and deliberately not another entry on the --no-frames
+        # denylist. That denylist is two words: a path is dropped only if
+        # `keyframes` or `frames` is one of its components, so every other
+        # working-file folder publishes as if it were finished work. On
+        # 2026-08-19 the live field was 418 assets of which 209 were stills, and
+        # 201 of those were LoRA validation grids, compositing backgrounds, QA
+        # edge-band overlays, contact sheets and flow masks. A local export had
+        # gone further and swept in numbered frames from a folder called
+        # `rejected_v1_return`. Extending the denylist would have fixed exactly
+        # those names and none of the next ones.
+        #
+        # The founder's rule for this gallery: it shows FINISHED VIDEO WORK.
+        # An allowlist fails safe. A new working folder is now excluded by
+        # default rather than published by default, which is the opposite of
+        # what happened here twice.
+        if video_only and ext not in VID_EXT:
             continue
         if cutoff and generated_ts(f) < cutoff:
             continue
@@ -335,12 +380,29 @@ def main() -> int:
                          "in its name, so a name filter silently missed 5 of the 6 "
                          "vertical pieces. Standing, so tomorrow's conform qualifies "
                          "automatically.")
-    ap.add_argument("--cluster-by", choices=("dir", "screen"), default="dir",
+    ap.add_argument("--cluster-by", choices=("dir", "screen", "notion"), default="dir",
                     help="what a cluster MEANS. 'dir' (default) clusters by the "
                          "render's directory, which is the run that made it. "
                          "'screen' clusters by the LED wall the file is for "
                          "(screen-a / screen-bc / unassigned) -- the deliverable "
-                         "view rather than the production view.")
+                         "view rather than the production view. 'notion' clusters "
+                         "by the Arendt notion in the filename (labor / work / "
+                         "action, in that order; 'unsorted' for a file naming "
+                         "none) -- the conceptual view for the Arendt field.")
+    ap.add_argument("--approved-file", type=Path, default=None,
+                    help="the admission gate: keys NOT in this allowlist never "
+                         "enter the field -- the same shape as the RNMW inbox, "
+                         "where an undecided contribution is not in the archive "
+                         "at all. The queue is reviewed at ?review=1 (review.js "
+                         "over serve_glance's /api/contributions) and a Keep "
+                         "there is what grows this file.")
+    ap.add_argument("--video-only", action="store_true",
+                    help="finished VIDEO work only; drop every still. This field "
+                         "is a video gallery, and --no-frames alone does not make "
+                         "it one: that flag drops only paths containing a "
+                         "`keyframes`/`frames` component, so validation grids, "
+                         "compositing layers, QA overlays and contact sheets all "
+                         "publish as finished pieces.")
     ap.add_argument("--dest", default=None,
                     help="output dir (default outputs/_glance); thumbs are still cached "
                          "in outputs/_glance/thumbs and copied in")
@@ -362,9 +424,31 @@ def main() -> int:
     items = collect(not args.no_frames, args.limit, args.include,
                     since_days=args.since_days, exclude_keys=excl, match=args.match,
                     specs=({tuple(int(v) for v in sp.lower().split("x")) for sp in args.spec}
-                           if args.spec else None))
+                           if args.spec else None),
+                    video_only=args.video_only)
     if not items:
         sys.exit("nothing to export")
+
+    approved: set[str] | None = None
+    if args.approved_file:
+        import json as _json
+        try:
+            approved = {k for k in _json.loads(
+                Path(args.approved_file).read_text(encoding="utf-8")).get("approved", [])}
+        except FileNotFoundError:
+            sys.exit(f"--approved-file {args.approved_file} does not exist; seed it "
+                     "first (a missing gate must fail loudly, not admit everything)")
+        n_pending = sum(1 for _, rel, _, _ in items if rel.as_posix() not in approved)
+        print(f"admission gate: {len(approved)} approved; {n_pending} awaiting review "
+              "(not in this build; see ?review=1 on the local server)")
+
+    # The card's swipe deck is the field array in ORDER, so the array must be
+    # cluster-contiguous for the clustering the field claims. Directory clustering
+    # gets that for free from the alphabetical walk; notion clustering does not
+    # (labor_/work_/action_ interleave alphabetically), so sort here.
+    if args.cluster_by == "notion":
+        items.sort(key=lambda it: (NOTION_ORDER.get(notion_of(it[1]), 5),
+                                   it[1].as_posix()))
 
     thumbs = DEST / "thumbs"
     (DEST / "data").mkdir(parents=True, exist_ok=True)
@@ -390,6 +474,8 @@ def main() -> int:
     t0 = time.time()
 
     for i, (f, rel, is_video, is_frame) in enumerate(items):
+        if approved is not None and rel.as_posix() not in approved:
+            continue                      # awaiting review; not in the archive yet
         sha = sha16_of(rel)
         tp = THUMB_CACHE / f"{sha}.jpg"
 
@@ -459,14 +545,23 @@ def main() -> int:
             ctx = group
             run = screen_of(rel, dimensions(f))
             group = run
+        if args.cluster_by == "notion":
+            # Same rule screen mode learned the hard way (above): `group` must
+            # become the notion too, or clusterKey() (group || event) silently
+            # reverts the layout to the directory while the labels say otherwise.
+            ctx = group
+            run = notion_of(rel)
+            group = run
         date = datetime.fromtimestamp(f.stat().st_mtime, timezone.utc).date().isoformat()
         kind = "frame" if is_frame else ("render" if is_video else "still")
         caption = rel.stem.replace("_", " ").replace("-", " ")
         scene = [s for s in {kind, group, ctx, "video" if is_video else "image"} if s]
 
+        order = (NOTION_ORDER.get(run, 5) if args.cluster_by == "notion"
+                 else len(events) + 1)
         events.setdefault(run, {"slug": run, "label": run.replace("-", " "),
                                 "venue": group, "date": date, "kind": kind,
-                                "group": group, "order": len(events) + 1,
+                                "group": group, "order": order,
                                 "description": f"{ctx} / {run}"})
         lora = lora_of(f)
         dims = dimensions(f) if is_video else None
