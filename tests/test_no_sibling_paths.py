@@ -84,8 +84,15 @@ PATTERNS: list[tuple[str, re.Pattern[str], str, tuple[str, ...], tuple[str, ...]
         None,
     ),
     (
+        # IGNORECASE is load-bearing, not tidiness. The viewer's upstream moved on
+        # 2026-08-19 to a repo whose name EXTENDS the kit's as a case-varied prefix.
+        # A case-insensitive match on the already-published kit name therefore covers
+        # the new upstream, and any future suffix of it, WITHOUT writing that private
+        # repo's name into this public file. Naming it here would violate the very
+        # rationale below, since ALLOWED concedes that this file publishes whatever
+        # it forbids.
         "sibling project in CODE",
-        re.compile(r"RNMW-agent|Ruins-Harness_Tools-for-Agents|Ruins-agent"),
+        re.compile(r"RNMW-agent|Ruins-Harness_Tools-for-Agents|Ruins-agent", re.I),
         "code must not reach into a parallel project at runtime. Prose may name one: "
         "the glance tool is a released dependency the manual has to tell you how to "
         "install, and the workstream registry names the studio repo to define a "
@@ -100,6 +107,21 @@ PATTERNS: list[tuple[str, re.Pattern[str], str, tuple[str, ...], tuple[str, ...]
         "neither must tools/ or datasets/, which is where the key leak actually was. "
         "Documenting the lineage in docs/ is fine and deliberately not covered",
         CODE_DIRS,
+        SOURCE_EXTS,
+    ),
+    (
+        # A shape rule, so it names no repo and survives a rename. The failure it
+        # prevents is already attested here: a tracked file carried a literal
+        # `../<sibling>/tools/ship.py` command that worked only by accident (that
+        # script resolves its repo from the process CWD) and fails on any machine
+        # without that sibling checked out alongside this one.
+        "sibling checkout escape in CODE",
+        re.compile(r"\.\.[\\/][A-Za-z0-9._-]*(?:ruins|rnmw|glance)", re.I),
+        "a parent-relative path into a neighbouring checkout hardcodes this machine's "
+        "layout and breaks on every other one. The viewer is resolved at build time via "
+        "--glance / $GLANCE_HOME and deliberately has no default; anything needing a "
+        "sibling tool should use this repo's own copy",
+        ALL_DIRS,
         SOURCE_EXTS,
     ),
     (

@@ -14,9 +14,13 @@ Two galleries exist and they answer different questions. Do not confuse them:
 | [publish-for-review](../publish-for-review/SKILL.md) | `gallery.py` + tunnel | "look at THIS batch" |
 | **this one** | `glance_export.py` + `glance_deploy.py` | "what have we actually rendered" |
 
-Glance is a separate tool (`Ruins-Harness_Tools-for-Agents/glance/`) that knows nothing
-about this repo. It reads a published data contract; `tools/glance_export.py` is our
-implementation of it. Point at another checkout with `--glance` or `$GLANCE_HOME`.
+Glance is a separate tool that knows nothing about this repo. It reads a published
+data contract; `tools/glance_export.py` is our implementation of it. Resolve it with
+`--glance` or `$GLANCE_HOME`; there is deliberately no default.
+
+**Where it comes from, and whether a change belongs upstream or here, is stated in
+exactly one place: [docs/manual/glance-viewer.md](../../../docs/manual/glance-viewer.md).**
+Read it before changing anything the field renders. Do not restate its facts here.
 
 ## Updating the link after new renders
 
@@ -116,6 +120,202 @@ curl -s https://glance-deploy.vercel.app/data/catalogue.json | python -c "import
 Then open it, confirm tiles render, type a query and watch the field reflow, and click
 a video card. Zero console errors is part of the check, not a bonus.
 
+
+## THE WORKING GALLERY (2026-08-14). Read this before touching any export flag.
+
+**Stable URL: https://glance-arendt-deploy.vercel.app** -- its OWN Vercel pin
+(`.glance-arendt-vercel.json`), separate from `ledwall`, because the two fields
+were sharing one project and overwriting each other. Tier 3, login-gated editing,
+public to look at.
+
+**ONE list decides what is visible, and it lives on the server.** Until today four
+things did, and they disagreed: `approved.json`, `cumulative.json`, the export
+filters, and `glance_hidden`. Measured on the live deploy before the fix: 18 of 24
+undecided renders were already public, 30 approved items were NOT on the field,
+and 22 live items had never been approved. That is not a strict gate or a lax one,
+it is an unrelated one -- and it is what the founder meant by "the gate is still
+not really working".
+
+Now:
+
+- **The build ships everything** that matches the include/match filters.
+- **`glance_hidden` (Supabase) alone decides what is not shown**, at runtime, for
+  every viewer, reversibly, per item, with NO rebuild. `cumulative.json`'s 147
+  entries were migrated into it and `--exclude-file` is no longer used.
+- **`approved.json` is the gate for NEW work only.** It was baselined to the whole
+  field on 2026-08-14, so it is a no-op for everything that already existed and
+  bites only on the next render.
+
+```bash
+# THE canonical build. Changing a flag here changes founder-visible state.
+py -3.11 tools/glance_export.py --no-frames \
+    --include arendt --include nyc-billboard/delivery-final \
+    --match "*.mp4" --match "*.mov" --cluster-by notion \
+    --approved-file outputs/_glance-inbox/approved.json \
+    --dest outputs/_glance-arendt
+# NO --exclude-file: removals are server-side now. Adding it back double-gates
+# and makes a removal permanent-and-invisible instead of reversible.
+
+# ...then deploy (tier-3 flags below), and ALWAYS close with:
+py -3.11 tools/glance_sort_curations.py --apply
+```
+
+**The last line is not optional, and it is the step most likely to be forgotten.**
+The two standing curations are not snapshots of a moment, they are a STANDING RULE
+about where work belongs:
+
+| | |
+|---|---|
+| wall spec (1728x540 / 912x2736) | **NYC bill board** |
+| everything else still visible | **Objkt** |
+
+A share's key set is otherwise FROZEN by design, so new renders would never join a
+curation and a removed one would keep travelling in a link after leaving the field.
+`glance_sort_curations.py` re-derives both from the deployed field and writes them
+back, keeping the same tokens, links and open counts. It is idempotent, it prints
+the diff before writing, it excludes anything in `glance_hidden`, and it **refuses
+to write if an asset would land in both curations** -- wall-spec work belongs to
+the billboard set and must not also fall into the catch-all.
+
+It sorts by **actual width/height from the catalogue, never by filename**: a
+client-named delivery file carries no spec suffix, and a filename match once found
+1 of the 6 files that really were 912x2736 and shipped a silently horizontal-only
+set. The three `SUBJECTS THROUGH TIME` deliverables land in the billboard set for
+exactly this reason.
+
+Deploy with the tier-3 flags (`--pin arendt`, `--api-base`, `--auth-url`,
+`--auth-anon-key`); a build without them silently drops to tier 0, which removes
+login, review, download and curation in one go, with no error anywhere.
+
+**`--match "*.mp4" --match "*.mov"` is load-bearing.** Without it the field is
+5,007 tiles of anchors, masks and keyframes and the renders are unfindable. An
+"output" here is a finished video.
+
+**Four bugs on the review path, all fixed 2026-08-14, all invisible to greps and
+curl.** Each one presented as "nothing happens": `review-bar.js` used `hasAuth`
+and `CONFIG` without importing them (module dies at load, pill never renders);
+`glance.js` passed the dead `__GLANCE_EDITOR_TOKEN__` global to the queue builder
+(401 -> silent fallback to the whole archive, so the pill looked like a page
+reload); the backend's CORS allow-list omitted `apikey`, so the browser refused
+the preflight while curl saw a healthy 200; and review posters were presigned R2
+URLs, which an `<img crossOrigin>` cannot load (no CORS header, no way to send a
+token), so the queue rendered blank tiles. **Check payload JavaScript by LOADING
+THE PAGE and reading the console.** `node --check` parses these as CommonJS and
+misses duplicate top-level declarations; a grep of the deployed file proves the
+new code shipped, not that it runs.
+
+## The Arendt field: notion clusters + the admission queue (2026-08-13, founder-directed)
+
+**The ledwall export/deploy dirs now carry the ARENDT field**, and its build has TWO
+founder-directed properties. Any rebuild that omits these flags REVERTS founder-visible
+state (it happened twice on 2026-08-13, mid-session):
+
+```bash
+py -3.11 tools/glance_export.py --no-frames --include arendt --cluster-by notion \
+    --approved-file outputs/_glance-inbox/approved.json \
+    --exclude-file outputs/_glance-inbox/cumulative.json \
+    --dest outputs/_glance-ledwall
+py -3.11 tools/glance_deploy.py --export outputs/_glance-ledwall \
+    --out outputs/_glance-ledwall-deploy \
+    --pin ledwall --curate --tile-fit contain --max-asset-mb 12 --collection ledwall
+py -3.11 tools/serve_glance.py --port 8766        # queue routes ON by default (--queue arendt)
+```
+
+- **`--cluster-by notion`**: labor / work / action, in Arendt's order, derived from the
+  filename tokens; a file naming none lands in `unsorted`. The field array is sorted
+  cluster-contiguous so the card swipe deck walks the argument in order.
+- **`--approved-file`**: the ADMISSION GATE. A render that is not in `approved.json`
+  never enters the field -- the same shape as the RNMW inbox, where an undecided
+  contribution is not in the archive at all. **All new generations queue for the
+  founder's review**; nothing walks straight onto the field, including yours.
+- **The queue is reviewed at `?review=1`** on the local server: `review.js` builds the
+  queue AS a field (batched by notion + day, "render pipeline" as contributor) and
+  `review-bar.js` -- the decide surface ported into the white-label from RNMW's editor
+  layer -- offers Keep / Reject. Keep grows `approved.json`, Reject grows
+  `rejected.json`, originals are never touched; a re-export then moves the decision
+  onto the field. serve_glance upgrades the SERVED config to tier 3 for this
+  (response-patch; the built file and the Vercel deploy stay tier 0).
+- **One server, one port.** serve_glance instances stack on 8766 (Windows SO_REUSEADDR
+  lets multiple listeners share the port and requests route arbitrarily -- measured:
+  three listeners, a stale one answering). Before starting one, kill the listeners:
+  `netstat -ano | grep :8766` then `taskkill //PID <n> //F`.
+- **Check `python tools/agent-ops-harness/shared/ship.py claims` before rebuilding these dirs** --
+  parallel chats share this tree and two of them fought over this exact build twice.
+- **The Arendt gallery builds from `outputs/_glance-arendt`, not `_glance-ledwall`.**
+  A sibling chat rebuilds the ledwall dirs on its own schedule and overwrote this
+  build twice mid-deploy (once shipping 23 assets where 42 were intended). The
+  dedicated dir ends that race; `--pin` is now a free-form NAME, so a new field
+  gets its own Vercel project rather than borrowing one.
+
+### The review inbox (2026-08-14)
+
+Pending renders now live in R2, not only on this laptop, which is what lets
+review work anywhere:
+
+```bash
+py -3.11 tools/inbox_push.py --dry-run     # what is pending, nothing uploaded
+py -3.11 tools/inbox_push.py               # original + poster + _batch.json
+py -3.11 tools/decisions_pull.py           # bring remote decisions back, then re-export
+```
+
+- `tools/glance_queue.py` is the ONE definition of "pending" -- imported by both
+  `serve_glance.py` and `inbox_push.py`, so the queue you approve is the queue
+  that was pushed. Change the walk there, never in one of the two callers.
+- `sync_outputs.py` pushes automatically after a Modal pull; `--no-inbox` skips it.
+- **Uploading is not approving.** The inbox touches neither the catalogue nor the
+  approve/reject lists; an inbox object is invisible to the field until decided.
+- A file in `cumulative.json` (a curation removal) is NOT re-queued -- re-offering
+  something the founder removed would resurrect it. Twice during verification the
+  "smallest pending file" turned out to be exactly this, which is the rule working.
+
+### The review backend (live 2026-08-14)
+
+Supabase project **`vvnpshvfpbbhhcrzqfol`** ("Slow Interpolation", eu-central-1).
+Function at `https://vvnpshvfpbbhhcrzqfol.supabase.co/functions/v1/glance`, source
+of truth `$GLANCE_HOME/backend/`. Credentials live in
+`tools/.env` (`SI_SUPABASE_*`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) --
+**never paste a key into a shell or a chat; read it from that file**, which is how
+every command below is written.
+
+Deploying the gallery WITH review (tier 3) rather than plain tier 0: pass the
+three backend flags. A build without them stays tier 0, which is correct for any
+field that should not carry a login.
+
+```bash
+py -3.11 tools/glance_deploy.py --export outputs/_glance-arendt \
+  --out outputs/_glance-arendt-deploy --pin ledwall --curate --tile-fit contain \
+  --max-asset-mb 45 --max-mb 700 --no-bundle-proxies --collection ledwall \
+  --title "Slow Interpolation" --glance "$GLANCE_HOME" \
+  --api-base "https://<ref>.supabase.co/functions/v1/glance" \
+  --auth-url "https://<ref>.supabase.co" --auth-anon-key "<anon>" --deploy --prod
+```
+
+- **Redeploying the function** after editing the white-label source:
+  `cp "$GLANCE_HOME/backend/index.ts" supabase/functions/glance/index.ts`
+  then `npx supabase functions deploy glance --project-ref <ref> --no-verify-jwt`.
+  `--no-verify-jwt` is required: the function does its OWN editor check and must be
+  able to answer 401 itself rather than have the platform reject the request first.
+- **Editors are a table, not a config.** Add one with an INSERT into
+  `glance_editors` (email is enough, before they ever sign in).
+- **The archive catalogue is never touched by review.** Approving records a
+  decision; `nyc-billboard/_catalogue.json` is asserted unchanged after every
+  inbox run, and that assertion is worth keeping.
+- **Approvals reach the field via `decisions_pull.py` + a re-export**, not
+  automatically -- the same "in the archive, not yet published" model RNMW uses.
+- **The sign-in email must send a CODE, not a link, and Supabase's default does
+  the opposite.** `glance/login.js` renders a 6-digit input and calls `verifyOtp`
+  with what you type, but the stock `magic_link` template mails
+  `{{ .ConfirmationURL }}` -- so the first sign-in produced an email the panel in
+  front of you could not use (founder, 2026-08-14). Fixed by
+  `supabase/templates/magic_link.html` (`{{ .Token }}`) pushed with
+  `npx supabase config push --project-ref <ref>`. `supabase/config.toml` is kept
+  deliberately MINIMAL: `config push` writes everything the file declares, so a
+  fuller config copied from a template would push defaults over settings nobody
+  meant to change. Verified end to end by sending one to a mailbox the email
+  bridge can read and asserting the body carried a 6-digit code and no
+  `ConfirmationURL`. Note it arrived flagged **[SPAM]** there (Supabase's
+  `noreply@mail.app.supabase.io` is not in the bridge's trusted list) -- if an
+  editor says no email arrived, check junk before re-sending.
 
 ## The curated LED-wall field (second deployment, 2026-08-10)
 
@@ -234,7 +434,7 @@ becomes real for every viewer via a rebuild. Two routes:
 A permanent version (a Vercel function committing the list into the repo, token in Vercel
 env vars only, never in the browser) is priorities row DT14.
 
-Real in-field Tier 2 curation lives ONLY in the private RNMW-agent repo and would be a
+Real in-field Tier 2 curation lives ONLY upstream of the viewer and would be a
 hand-port (`write.js` hardcodes RNMW's EVENT_PROFILES); the white-label manifest excludes it
 by design.
 

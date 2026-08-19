@@ -10,7 +10,7 @@ display surfaces whose names overlap. Route by job:
 | **Browse, triage, or share the current state of a dataset**, read-only: finals only, staged crops applied, searchable audit and curation tags | the dataset Glance mosaic, `tools/mosaic-glance/` | this page |
 
 The mosaic is a tier 0 Glance archive (the same viewer the render gallery uses,
-from `Ruins-Harness_Tools-for-Agents/glance/`, treated as a released dependency).
+resolved via `$GLANCE_HOME`, treated as a released dependency).
 It is a *view* of `datasets/<name>/`, never a writer of it: the builder reads the
 dataset's own truth and writes only under `tools/mosaic-glance/`.
 
@@ -41,7 +41,7 @@ own demo server, use 8768+ for mosaics. First time for a new dataset, install
 the viewer payload into the site directory before building:
 
 ```bash
-python <path-to>/Ruins-Harness_Tools-for-Agents/glance/install.py \
+python "$GLANCE_HOME/install.py" \
   --target tools/mosaic-glance/site-<name> --config tools/mosaic-glance/glance-config-<name>.json
 ```
 

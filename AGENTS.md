@@ -86,6 +86,20 @@ Why this rule exists: in 2026-05-18 the Compositing chat needed a Soutine refere
 
 When in doubt: ask the user "is there an existing protocol for this?" before writing new code.
 
+## Do not fix the viewer from here
+
+The Glance viewer is a released dependency, not vendored code. Before you change anything the field renders, **your FIRST action is to answer one question: would another archive want this?** If yes, it is not yours to write in this repo, and an edit made in a local checkout of the viewer is destroyed by the next install. Only a NO puts the work here, and then it goes through the injected layer, never into the installed payload.
+
+The inventory, so the answer is a lookup rather than a judgement call:
+
+- **Yes, so it goes upstream.** A layout bug, cards overlapping, a missing control, a config key any adopter would set, a data-contract field, anything under the installed `glance/` directory. You hand this to the maintainer by describing the behaviour. You do not name a path, and you do not edit a checkout expecting the edit to survive.
+- **No, so it stays here.** How our outputs become a catalogue (`tools/glance_export.py`), how a field is assembled and shipped (`tools/glance_deploy.py`), the tier 0 curation face (`tools/glance_curate.js` + `tools/glance_curate_hide.js`, injected at build time and never installed), the review queue (`tools/glance_queue.py`, `tools/inbox_push.py`, `tools/decisions_pull.py`), and which Vercel project a field pins to.
+- **Neither, so it is a decision.** Anything you cannot place in a minute. Ask before building, exactly as the manual-scan rule above says.
+
+Why this rule exists: on 2026-08-19 the viewer's upstream moved, and an audit found **17 tracked statements in this repo asserting the old one**. Every one was correct when written. The direction had been restated in 17 places instead of stated in one, so it went stale in 17 places. It now lives in [docs/manual/glance-viewer.md](docs/manual/glance-viewer.md), and everywhere else links there instead of restating it.
+
+When in doubt: build it in the injected layer here and say so in the session log. A local extension that should have gone upstream is a duplicate someone will find; an upstream change that should have stayed local is imposed on every other adopter, and you cannot see them.
+
 ## The four subagents
 
 The repo ships four capability-domain subagents. Any chat can invoke any of them via the Agent tool. They replace the older "parallel-workstream chats own per-folder write zones" framing; workstream folders are now time-bounded project logs (one folder per in-flight or shipped initiative), not capability namespaces.

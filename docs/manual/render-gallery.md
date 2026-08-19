@@ -15,6 +15,38 @@ maintainer writes on it.
 Only this one deals with video, delivery specs and feedback notes. If the task
 mentions a dataset or a student, you are on the wrong page.
 
+## The whole-outputs view (Glance)
+
+`gallery.html` answers "look at this batch". It cannot answer "what have we
+actually rendered", because 3,000 renders in a vertical list is not a shape you can
+see. `tools/glance_export.py` publishes `outputs/` as a **Glance** archive: one
+WebGL field, every render a tile, clustered by run, reflowing under a query.
+
+```bash
+python tools/glance_export.py --no-frames --dest outputs/_glance-renders   # 418 finished renders
+python tools/glance_export.py                                              # 2,951, keyframes included
+```
+
+Then serve it with the viewer (a separate tool, resolved via `$GLANCE_HOME`):
+
+```bash
+python <path-to>/glance/serve.py --data outputs/_glance-renders --originals outputs
+```
+
+`--originals` is what lets video play: each record carries a direct `media_url`, so
+the card plays the MP4 straight off disk with no signing endpoint and no backend.
+
+**Which view.** `--no-frames` is the gallery view and the one to default to: 418
+finished renders, legible clusters. The full export is 2,951 tiles and is dominated
+by 2,533 keyframes, which is honest but buries the renders. The full one is worth
+opening when the question is about a run's drift rather than about a deliverable,
+because a sequence reads as a colour arc across its cluster.
+
+Glance knows nothing about this repo. It reads a published data contract
+(`glance/docs/data-contract.md`), and `glance_export.py` is this repo's
+implementation of it. Output under `outputs/_glance*` is a build artifact:
+regenerate it, never edit it. Nothing in the exporter reads or writes a render.
+
 ## The three tools
 
 | Tool | Does | Run it when |

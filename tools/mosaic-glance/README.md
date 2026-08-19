@@ -1,7 +1,7 @@
 # Dataset Mosaic on Glance (read-only dataset viewer)
 
 A rebuild of the dataset-curation gallery's *display* on the Glance WebGL viewer
-(`Ruins-Harness_Tools-for-Agents/glance/`, treated as a released dependency and
+(resolved via `$GLANCE_HOME`, treated as a released dependency and
 never modified). The curation gallery at `datasets/<name>/gallery.html` +
 `serve.py` keeps working unchanged and remains the only ACTION surface; nothing
 under `datasets/` is ever written by this tool.
