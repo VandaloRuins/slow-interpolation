@@ -166,6 +166,45 @@ plus a re-render, which costs no API calls.
 **Wrap bridge**: the edit model accepts MULTI-IMAGE input. Hand it the last
 keyframe AND frame 0, ask for "the exact in-between moment". Halves the seam step.
 
+## 3b. Bridges are the fault line. Blend the close ones.
+
+**Every content defect this project has recorded came from a BRIDGE; none from an
+anchor** (8 in ~130 calls, 2026-08-19/20: a poem carved on a gravestone, an
+invented epitaph, human faces sculpted into stone, ivy neither endpoint had, a
+vortex in the grass, a bouquet leaving frame, two sideways jumps, roses turning
+pink, one bloom growing).
+
+The cause is structural: an anchor edits a real previous image, so it inherits. A
+bridge invents. And `banana_keyframes.py` builds the `--bridge` prompt internally
+and takes **no caller text**, so every preservation clause you write into `--edit`
+reaches the anchors and **none reaches the bridges**.
+
+**So do not generate a bridge you can blend.** Where endpoint mean-abs-diff is
+under **12**, a 50/50 average IS the correct in-between, is free, and cannot
+hallucinate:
+
+```python
+Image.fromarray(((a + b) / 2).astype(np.uint8)).save(bridge_path)
+```
+
+Set the threshold at 12, not 10: a gap of 10.08 missed a cutoff of 10 by 0.08,
+went to the model, and came back with a vortex painted into the grass. On a
+14-anchor / 56-state chain this leaves ~28 of 42 bridges as blends and reserves
+model calls for the genuine light transitions, which is where they earn their
+keep.
+
+**When you must generate, roll and keep the best MEASURED candidate**, never the
+first that returns. A re-roll draws a new random failure rather than converging: a
+bouquet 58 px off was re-rolled and came back 70 px off the other way. Score
+candidates on distance from a target, or from the mean of the two neighbours, and
+stop early when one is good enough.
+
+**Verification of the built chain is its own discipline**, and it is the highest
+defect-yield activity in the pipeline. See
+[chain-verification](../chain-verification/SKILL.md): check every ring rather than
+only the last, gate on a region strip rather than on any metric, and sweep the
+encoded video before showing anyone anything.
+
 ## 4. Interpolate locally, encode to exactly 300
 
 RIFE via `slow_interpolation.interpolation.RIFEInterpolator`, `n_passes=5`,
@@ -175,6 +214,20 @@ last keyframe before the wrap pair (the held beat).
 
 Encode: `-framerate <total/10> -vf fps=30 -frames:v 300`. Slight duplication is
 invisible; frame-DROP ratios near 1.5 are the documented judder.
+
+**`loop_render.py` hard-codes that 300-frame encode, and it will silently ruin a
+long piece.** Given a 56-state chain it builds all 1792 frames correctly and then
+drops them **2.99x into a 10-second file**, printing `896 frames -> 300 : DROP
+2.99x` as a *judder warning* rather than an error, exiting 0, and signing off with
+`verified: 1408,768,300` — which reads exactly like success. For anything that is
+not a 10 s loop, pass `--keep-frames` and encode yourself at true rate:
+
+```bash
+ffmpeg -y -framerate 30 -i <piece>.frames/%05d.png -c:v libx264 -crf 16 -pix_fmt yuv420p out.mp4
+```
+
+Then probe the artefact. `K * 2**passes` is the frame count to expect; if the mp4
+disagrees, the encode retimed it.
 
 **Do NOT reach for `minterpolate mci` on long chains** (this reverses the earlier
 guidance, measured 2026-08-13). It is block-based motion compensation and it smears
@@ -218,6 +271,28 @@ genuinely MOVES between endpoints, an unwarped chroma fade ghosts. Render with
 
 ## Known boundaries (do not rediscover)
 
+- **A loop cannot contain irreversible change.** "The grave is ruined and
+  weathered" cannot HAPPEN during the loop or it never returns to frame 0.
+  Establish it as a PROPERTY at frame 0 and cycle the reversible thing over it
+  (dirt and the care that removes it, lichen and its scrubbing). This is also the
+  more Arendtian reading: what recurs is the labour, not the ruin.
+- **Two changes must both advance in EVERY edit, or they take turns.** Asked for a
+  sun crossing AND a wilting bouquet, the piece delivered them alternately: the
+  shadow sat still at one centroid for 9 states, teleported 276 px, sat still for
+  16 more. Correlation between the two motions was **+0.006**. The cause was in the
+  prompts — some edits said "ONLY the sun moves", others "ONLY the flowers change".
+  Name both in every single edit, then measure the correlation to confirm.
+- **A discrete event, once bridged, becomes a morph.** A bouquet REPLACED between
+  two anchors is bridged twice into a four-step brown-to-white blend, which reads
+  as resurrection rather than as someone having visited. Either hide the swap where
+  it cannot be read (inside the darkest states, or inside a large light change), or
+  accept the morph. You cannot bridge a cut and keep it a cut.
+- **Turning off `BASE_SUFFIX` removes the text ban from EVERYTHING, not just the
+  base.** `--no-base-suffix` plus a hand-written replacement appended to `--base`
+  leaves `EDIT_PREAMBLE` carrying no ban at all, and a preservation clause that
+  only says "the inscription stays the same" never says "add no OTHER lettering".
+  Result: runes, a second invented sentence, and a monogram. If a piece genuinely
+  needs text, repeat the full ban in every `--edit` as well.
 - **No human hands, ever** (Luca, 2026-08-13). Objects and places, at most
   crowds; never hands active in a task ("it does not convert well, while the
   chair slowly aging by itself looked very promising"). The acting element is

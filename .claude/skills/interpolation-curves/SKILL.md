@@ -20,6 +20,13 @@ duration        = total_frames / fps
 `conform.py` **refuses below 300 frames**. Check this before every dispatch; it is the
 most common reason a sweep config is invalid.
 
+**That arithmetic is the CONFIG pipeline's. `tools/loop_render.py` uses a different
+one** — `frames = K * 2**passes`, with `skip_boundary` fixed at 0 and every pair of
+the closed ring counted. Verified against real chains: `grow_farmhouse` 14 states →
+448, `labor_embers` 8 → 256, `action_snow` 10 → 320 plus its 10-frame held beat =
+330. Using the config formula on a banana chain gives 278/309/371 and is wrong every
+time. Check which tool built the piece before you predict a frame count.
+
 To change pair length while holding duration, scale K inversely. Typical points:
 
 | passes | skip | per pair | K for ~120 s at 30 fps |
@@ -91,3 +98,29 @@ interpolated frames were soft even after its keyframes got 76% sharper.
 **Sharpening the keyframes cannot fix a stage whose content moves too much between
 them.** Reduce the change per pair instead: simpler content, more keyframes, or lower
 strengths. See `visual-diagnosis` for telling the two apart.
+
+## Frames per pair is not the dial. Delta per pair is.
+
+Measured 2026-08-19/20, and it reverses the obvious reading of the table above.
+**64 frames/pair (`passes: 6`) produced the founder's stepping complaint on a
+14-state chain, and was completely clean on a 56-state one.** Same setting,
+opposite result, because 14 states across a whole year carry enormous deltas while
+56 states across one day carry small ones. What the viewer reads as "stepping" is
+the product of the two, never the frame count alone.
+
+So when a piece reads as stepped, **add keyframes before you touch passes**. Then
+`passes` is free to set the DURATION, since the same authored chain renders at any
+length for the cost of local compute only:
+
+| states | passes | frames/pair | frames | duration at 30 fps |
+|---|---|---|---|---|
+| 56 | 5 | 32 | 1792 | 59.7 s |
+| 56 | 6 | 64 | 3584 | 119.5 s |
+
+Both come from one authoring spend. Render both and let the founder choose; it
+costs nothing but time.
+
+**And beware picking a low `passes` for granularity.** Going to `passes: 4` (16
+frames/pair) to chase smoothness lands near the flattest-sharpness / worst-velocity
+corner of the table — the setting with the least focus breathing has the most
+stepping. `passes: 5` is the safe default on this pipeline.
